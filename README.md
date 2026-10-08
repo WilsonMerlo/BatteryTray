@@ -11,7 +11,7 @@ periféricos inalámbricos: mouse, teclado, auriculares, AirPods y mandos.
 | Fase | Contenido | Estado |
 |------|-----------|--------|
 | 0 | Herramienta de diagnóstico (consola) | ✅ |
-| 1 | Proveedores: Razer, AirPods, mando Xbox, Bluetooth genérico | pendiente |
+| 1 | Proveedores: Razer, Apple (AirPods/Beats), mandos, Bluetooth genérico | ✅ (falta probar AirPods con el estuche abierto) |
 | 2 | Interfaz de bandeja, autoarranque, notificaciones | pendiente |
 | 3 | Investigación: Flydigi, BlackShark V2 Pro Xbox, Keychron 2.4 GHz | pendiente |
 
@@ -19,9 +19,14 @@ periféricos inalámbricos: mouse, teclado, auriculares, AirPods y mandos.
 
 ```
 BatteryTray.sln
-Directory.Build.props        configuración común (TFM, nullable, etc.)
-tools/BatteryTray.Diag/      fase 0: diagnóstico por consola
-src/                         (fases 1-2) Core con los proveedores y App de bandeja
+Directory.Build.props          configuración común (TFM, nullable, etc.)
+src/BatteryTray.Core/          modelo, proveedores, monitor, configuración y log
+  Providers/Razer/             protocolo de feature reports de Razer (OpenRazer)
+  Providers/Apple/             AirPods/Beats por BLE "proximity pairing"
+  Providers/                   mandos (Windows.Gaming.Input) y Bluetooth genérico
+tools/BatteryTray.Diag/        fase 0: diagnóstico por consola
+tools/BatteryTray.Cli/         fase 1: consola para probar los proveedores
+tests/BatteryTray.Core.Tests/  tests de los decodificadores (xUnit)
 ```
 
 ## Requisitos
@@ -61,13 +66,58 @@ Secciones del reporte:
 
 El reporte incluye direcciones Bluetooth de tus dispositivos; tenelo en cuenta si lo compartís.
 
+## Fase 1 — Proveedores
+
+Cada proveedor cubre una **familia** de dispositivos y devuelve todos los que encuentra,
+así la app detecta periféricos nuevos sin tocar código:
+
+| Proveedor | Qué detecta | Cómo |
+|-----------|-------------|------|
+| Razer (HID) | Cualquier periférico Razer con batería | Feature reports de 90 bytes (protocolo de OpenRazer). Tabla con ~80 PIDs de OpenRazer; los modelos desconocidos se prueban con los transaction IDs conocidos. |
+| Apple (BLE) | AirPods y Beats | Escucha los advertisements "proximity pairing" (company ID `0x004C`, tipo `0x07`). Resolución de 10 %. Solo muestra los modelos emparejados con la PC. |
+| Mandos | Cualquier mando reconocido por Windows | `Windows.Gaming.Input` → `TryGetBatteryReport()`. Los de Xbox informan en pasos gruesos. |
+| Bluetooth (Windows) | Teclados, mouse, auriculares Bluetooth | Propiedad de batería de la pila BT de Windows + servicio GATT Battery (`0x180F`). |
+
+Si un proveedor falla, los demás siguen y sus dispositivos conservan la última lectura.
+
+### Probar
+
+```
+dotnet build -c Release
+tools\BatteryTray.Cli\bin\Release\net8.0-windows10.0.19041.0\BatteryTray.Cli.exe [--watch] [--wait 10] [-v]
+dotnet test
+```
+
+### Configuración
+
+`%AppData%\BatteryTray\config.json` (se crea la primera vez). Los logs van a `%AppData%\BatteryTray\logs`.
+
+| Clave | Default | Descripción |
+|-------|---------|-------------|
+| `pollIntervalSeconds` | 120 | Intervalo de consulta |
+| `lowBatteryThreshold` | 20 | Umbral de aviso de batería baja (%) |
+| `aliases` | `{}` | Nombre propio por id, p. ej. `{ "apple:201B": "Mis AirPods" }` |
+| `hiddenDevices` | `[]` | Ids a ocultar |
+| `providers.<x>.enabled` | true | Activa/desactiva cada proveedor |
+| `providers.razer.probeUnknownDevices` | true | Probar modelos Razer que no están en la tabla |
+| `providers.razer.extraDevices` | `[]` | `{ "pid": "0x00XX", "transactionId": "0x1F", "hasCharging": true, "waitMs": 60 }` |
+| `providers.apple.onlyPairedModels` | true | Solo modelos emparejados (evita mostrar los AirPods de otros) |
+| `providers.apple.minRssi` | -90 | Ignorar señales más débiles (dBm) |
+
+Los ids de cada dispositivo se ven en la salida de `BatteryTray.Cli`.
+
+### Créditos
+
+Los datos de protocolo (bytes, offsets y tablas de modelos) se tomaron de
+[OpenRazer](https://github.com/openrazer/openrazer) y [CAPod](https://github.com/d4rken-org/capod).
+No se copió código.
 ## Dispositivos identificados
 
 | Dispositivo | Conexión | VID:PID | Notas |
 |-------------|----------|---------|-------|
 | Razer Viper V3 Pro SE | receptor HyperPolling 2.4 GHz | `1532:00DF` | MI_00 con feature report de 91 B (protocolo Razer) |
 | Keychron K8 HE | cable | `3434:0E80` | MI_01: raw HID QMK (`FF60:0061`, 32 B) |
-| Keychron Link (receptor 2.4 GHz) | USB | `3434:D030` | MI_03: raw HID (`FF60:0061`); MI_01: page `0x8C` con feature reports de 1000 B |
+| Keychron K8 HE por 2.4 GHz → Keychron Link | USB | `3434:D030` | MI_03: raw HID (`FF60:0061`); MI_01: page `0x8C` con feature reports de 1000 B |
 | AirPods 4 ANC | Bluetooth clásico | BT `004C:201B` | Windows no expone batería; BLE proximity pairing con modelo `0x201B` (bytes `1B 20`) |
 | Mando Xbox | Xbox Wireless Adapter `045E:02FE` | `045E:0B12` | `Windows.Gaming.Input` devuelve `BatteryReport` (70 %, descargando) |
 | BlackShark V2 Pro Xbox | — | — | pendiente (todavía no lo tengo) |
