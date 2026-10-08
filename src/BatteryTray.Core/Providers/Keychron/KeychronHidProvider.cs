@@ -116,8 +116,13 @@ public sealed class KeychronHidProvider : IBatteryProvider
         };
     }
 
+    /// <summary>
+    /// Por 2.4 GHz, el primer pedido después de un rato de inactividad se pierde (despierta el
+    /// enlace); por eso se reintenta una vez.
+    /// </summary>
     static KeychronBatteryStatus? SendBattery(HidStream stream) =>
-        Exchange(stream, KeychronBatteryProtocol.CmdBattery, r => KeychronBatteryProtocol.ParseBattery(r));
+        Exchange(stream, KeychronBatteryProtocol.CmdBattery, r => KeychronBatteryProtocol.ParseBattery(r))
+        ?? Exchange(stream, KeychronBatteryProtocol.CmdBattery, r => KeychronBatteryProtocol.ParseBattery(r));
 
     /// <summary>
     /// Envía un comando y espera la respuesta que empiece con el mismo id. Otras apps (SignalRGB,

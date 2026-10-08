@@ -13,7 +13,7 @@ periféricos inalámbricos: mouse, teclado, auriculares, AirPods y mandos.
 | 0 | Herramienta de diagnóstico (consola) | ✅ |
 | 1 | Proveedores: Razer, Apple (AirPods/Beats), mandos, Bluetooth genérico | ✅ |
 | 2 | Interfaz de bandeja, autoarranque, notificaciones | ✅ |
-| 3 | Investigación: Flydigi, BlackShark V2 Pro Xbox, Keychron 2.4 GHz | pendiente |
+| 3 | Investigación: Keychron K8 HE por 2.4 GHz ✅ (firmware propio); Flydigi y BlackShark pendientes (no llegaron) | en curso |
 
 ## Estructura
 
