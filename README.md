@@ -14,6 +14,8 @@ En [Releases](../../releases) está `BatteryTray.exe`: un solo archivo, no hace 
 Copialo a una carpeta fija (por ejemplo `%LocalAppData%\Programs\BatteryTray`), ejecutalo y aparece
 el ícono en la bandeja. "Iniciar con Windows" se activa desde el menú del ícono.
 
+Si un dispositivo no aparece, ver [docs/dispositivos-nuevos.md](docs/dispositivos-nuevos.md) y usar `BatteryTray.Diag.exe` (también en Releases).
+
 Windows SmartScreen puede avisar que la app no está firmada: "Más información" → "Ejecutar de todas formas".
 
 ## Estado
@@ -89,6 +91,8 @@ así la app detecta periféricos nuevos sin tocar código:
 | Apple (BLE) | AirPods y Beats | Escucha los advertisements "proximity pairing" (company ID `0x004C`, tipo `0x07`). Resolución de 10 %. Solo muestra los modelos emparejados con la PC. |
 | Mandos | Cualquier mando reconocido por Windows | `Windows.Gaming.Input` → `TryGetBatteryReport()`. Los de Xbox informan en pasos gruesos. |
 | Keychron (HID) | Teclados Keychron con el firmware propio (K8 HE "sunset") | Comando raw HID `0xCA` al teclado (cable) o a través del Keychron Link (2.4 GHz). Ver `firmware/k8he-sunset`. |
+| Flydigi (HID) | Vader 5 Pro, Apex 5/6 (cable o receptor) | Comando `GET_INFO` del protocolo de SDL; pasos de 20 %. Sin probar con el mando real. |
+| HID genérico | Cualquier dispositivo con el campo HID estándar de batería | Battery Strength (0x06:0x20) o State Of Charge (0x85), leído sin mandar comandos. |
 | Bluetooth (Windows) | Teclados, mouse, auriculares Bluetooth | Propiedad de batería de la pila BT de Windows + servicio GATT Battery (`0x180F`). |
 
 Si un proveedor falla, los demás siguen y sus dispositivos conservan la última lectura.
@@ -120,6 +124,8 @@ dotnet test
 | `providers.apple.onlyPairedModels` | true | Solo modelos emparejados (evita mostrar los AirPods de otros) |
 | `providers.apple.minRssi` | -90 | Ignorar señales más débiles (dBm) |
 | `providers.keychron.enabled` | true | Teclados Keychron con firmware propio |
+| `providers.flydigi.enabled` | true | Mandos Flydigi |
+| `providers.genericHid.enabled` | true | Proveedor HID genérico |
 
 Los ids de cada dispositivo se ven en la salida de `BatteryTray.Cli`.
 

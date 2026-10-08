@@ -34,6 +34,12 @@ public sealed class ProvidersConfig
 
     /// <summary>Teclados Keychron con el firmware propio que informa la batería (K8 HE "sunset").</summary>
     public ToggleConfig Keychron { get; set; } = new();
+
+    /// <summary>Mandos Flydigi (Vader 5 Pro, Apex 5/6) por cable o receptor.</summary>
+    public ToggleConfig Flydigi { get; set; } = new();
+
+    /// <summary>Cualquier dispositivo HID que declare un campo estándar de batería.</summary>
+    public ToggleConfig GenericHid { get; set; } = new();
     public ToggleConfig GameControllers { get; set; } = new();
     public ToggleConfig WindowsBluetooth { get; set; } = new();
 }
