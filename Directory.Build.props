@@ -1,0 +1,12 @@
+<Project>
+  <!-- Configuración común a todos los proyectos de la solución. -->
+  <PropertyGroup>
+    <!-- TFM con versión de Windows: habilita las proyecciones WinRT (Bluetooth, Gaming.Input, etc.). -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>
