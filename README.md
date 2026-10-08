@@ -159,3 +159,8 @@ src\BatteryTray.App\bin\Release\net8.0-windows10.0.19041.0\BatteryTray.exe
 | Mando Xbox | Xbox Wireless Adapter `045E:02FE` | `045E:0B12` | `Windows.Gaming.Input` devuelve `BatteryReport` (70 %, descargando) |
 | BlackShark V2 Pro Xbox | — | — | pendiente (todavía no lo tengo) |
 | Flydigi Vader 5 Pro | — | — | pendiente |
+
+## Licencia
+
+[GPL-2.0-or-later](LICENSE). El firmware de `firmware/k8he-sunset` deriva del firmware de Keychron
+(QMK) y del módulo SignalRGB de SRGBmods, ambos GPL-2.0-or-later.
