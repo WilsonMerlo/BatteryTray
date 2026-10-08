@@ -65,10 +65,10 @@ El reporte incluye direcciones Bluetooth de tus dispositivos; tenelo en cuenta s
 
 | Dispositivo | Conexión | VID:PID | Notas |
 |-------------|----------|---------|-------|
-| Razer Viper V3 Pro SE | receptor 2.4 GHz / cable | `1532:00DF` | MI_00 con feature report de 91 B (protocolo Razer) |
+| Razer Viper V3 Pro SE | receptor HyperPolling 2.4 GHz | `1532:00DF` | MI_00 con feature report de 91 B (protocolo Razer) |
 | Keychron K8 HE | cable | `3434:0E80` | MI_01: raw HID QMK (`FF60:0061`, 32 B) |
 | Keychron Link (receptor 2.4 GHz) | USB | `3434:D030` | MI_03: raw HID (`FF60:0061`); MI_01: page `0x8C` con feature reports de 1000 B |
-| AirPods 4 ANC | Bluetooth | BT `004C:201B` | — |
-| Mando Xbox | — | — | hay un Xbox Wireless Adapter `045E:02FE` conectado |
-| BlackShark V2 Pro Xbox | — | — | pendiente |
+| AirPods 4 ANC | Bluetooth clásico | BT `004C:201B` | Windows no expone batería; BLE proximity pairing con modelo `0x201B` (bytes `1B 20`) |
+| Mando Xbox | Xbox Wireless Adapter `045E:02FE` | `045E:0B12` | `Windows.Gaming.Input` devuelve `BatteryReport` (70 %, descargando) |
+| BlackShark V2 Pro Xbox | — | — | pendiente (todavía no lo tengo) |
 | Flydigi Vader 5 Pro | — | — | pendiente |
