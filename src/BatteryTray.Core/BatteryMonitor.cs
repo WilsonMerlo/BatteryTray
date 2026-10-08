@@ -42,7 +42,10 @@ public sealed class BatteryMonitor : IDisposable
         get
         {
             lock (_devices)
-                return _devices.Values.OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+                return _devices.Values
+                    .Where(d => !_config.HiddenDevices.Contains(d.Id, StringComparer.OrdinalIgnoreCase))
+                    .OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
         }
     }
 

@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>BatteryTray.App</RootNamespace>
+    <AssemblyName>BatteryTray</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BatteryTray.Core\BatteryTray.Core.csproj" />
+  </ItemGroup>
+
+</Project>

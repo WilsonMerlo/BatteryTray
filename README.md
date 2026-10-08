@@ -12,7 +12,7 @@ periféricos inalámbricos: mouse, teclado, auriculares, AirPods y mandos.
 |------|-----------|--------|
 | 0 | Herramienta de diagnóstico (consola) | ✅ |
 | 1 | Proveedores: Razer, Apple (AirPods/Beats), mandos, Bluetooth genérico | ✅ |
-| 2 | Interfaz de bandeja, autoarranque, notificaciones | pendiente |
+| 2 | Interfaz de bandeja, autoarranque, notificaciones | ✅ |
 | 3 | Investigación: Flydigi, BlackShark V2 Pro Xbox, Keychron 2.4 GHz | pendiente |
 
 ## Estructura
@@ -20,6 +20,7 @@ periféricos inalámbricos: mouse, teclado, auriculares, AirPods y mandos.
 ```
 BatteryTray.sln
 Directory.Build.props          configuración común (TFM, nullable, etc.)
+src/BatteryTray.App/           fase 2: app de bandeja (WinForms)
 src/BatteryTray.Core/          modelo, proveedores, monitor, configuración y log
   Providers/Razer/             protocolo de feature reports de Razer (OpenRazer)
   Providers/Apple/             AirPods/Beats por BLE "proximity pairing"
@@ -96,6 +97,9 @@ dotnet test
 |-------|---------|-------------|
 | `pollIntervalSeconds` | 120 | Intervalo de consulta |
 | `lowBatteryThreshold` | 20 | Umbral de aviso de batería baja (%) |
+| `notifications` | true | Notificación de Windows con batería baja |
+| `trayDevice` | null | Id del dispositivo que muestra el ícono (null = el más bajo) |
+| `verboseLog` | false | Log detallado |
 | `aliases` | `{}` | Nombre propio por id, p. ej. `{ "apple:201B": "Mis AirPods" }` |
 | `hiddenDevices` | `[]` | Ids a ocultar |
 | `providers.<x>.enabled` | true | Activa/desactiva cada proveedor |
@@ -111,6 +115,28 @@ Los ids de cada dispositivo se ven en la salida de `BatteryTray.Cli`.
 Los datos de protocolo (bytes, offsets y tablas de modelos) se tomaron de
 [OpenRazer](https://github.com/openrazer/openrazer) y [CAPod](https://github.com/d4rken-org/capod).
 No se copió código.
+## Fase 2 — App de bandeja
+
+![Ventana en tema oscuro y claro, e íconos de ejemplo](docs/preview.png)
+
+```
+dotnet build -c Release
+src\BatteryTray.App\bin\Release\net8.0-windows10.0.19041.0\BatteryTray.exe
+```
+
+- **Ícono**: muestra el nivel más bajo (o el dispositivo que elijas) con un color según el nivel:
+  verde > 50 %, amarillo ≤ 50 %, rojo ≤ umbral, azul cargando, gris sin datos. El tooltip lista todos.
+- **Clic izquierdo**: ventana con todos los dispositivos (nivel, barra, carga, conexión, antigüedad de la
+  lectura y partes de los AirPods). Clic en un dispositivo: fijarlo en el ícono, ocultarlo o copiar su id.
+- **Clic derecho**: actualizar, elegir qué muestra el ícono, avisos de batería baja, inicio con Windows,
+  dispositivos ocultos, abrir configuración y logs.
+- **Notificaciones**: una por dispositivo al cruzar el umbral; se vuelve a avisar cuando sube 5 % por encima o se carga.
+- **Inicio con Windows**: clave `Run` del usuario (sin administrador). Se registra la ruta actual del `.exe`,
+  así que conviene correrlo desde una carpeta fija (por ejemplo, publicándolo con
+  `dotnet publish src\BatteryTray.App -c Release -o %LocalAppData%\Programs\BatteryTray`).
+- **Configuración**: si editás `config.json` mientras la app corre, se recarga sola.
+- Sigue el tema claro/oscuro de Windows y la escala de pantalla.
+- `BatteryTray.exe --preview salida.png` guarda una imagen de la ventana con los dispositivos reales.
 ## Dispositivos identificados
 
 | Dispositivo | Conexión | VID:PID | Notas |

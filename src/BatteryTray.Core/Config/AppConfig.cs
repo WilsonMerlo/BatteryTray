@@ -9,6 +9,15 @@ public sealed class AppConfig
     /// <summary>Por debajo de este porcentaje se avisa con una notificación.</summary>
     public int LowBatteryThreshold { get; set; } = 20;
 
+    /// <summary>Mostrar notificación de Windows cuando un dispositivo cruza el umbral.</summary>
+    public bool Notifications { get; set; } = true;
+
+    /// <summary>Id del dispositivo cuyo nivel muestra el ícono; null = el nivel más bajo.</summary>
+    public string? TrayDevice { get; set; }
+
+    /// <summary>Log detallado (para depurar).</summary>
+    public bool VerboseLog { get; set; }
+
     /// <summary>Nombres personalizados: id del dispositivo → nombre a mostrar.</summary>
     public Dictionary<string, string> Aliases { get; set; } = [];
 

@@ -115,7 +115,11 @@ public sealed partial class AppleBleProvider : IBatteryProvider
                 // El filtrado (Apple + tipo 0x07) se hace en OnReceived.
                 _watcher = new BluetoothLEAdvertisementWatcher { ScanningMode = BluetoothLEScanningMode.Active };
                 _watcher.Received += OnReceived;
-                _watcher.Stopped += (_, e) => Log.Warn($"Apple: el escaneo BLE se detuvo ({e.Error})");
+                _watcher.Stopped += (_, e) =>
+                {
+                    if (e.Error == BluetoothError.Success) Log.Debug("Apple: escaneo BLE detenido");
+                    else Log.Warn($"Apple: el escaneo BLE se detuvo ({e.Error})");
+                };
             }
             _watcher.Start();
             Log.Info("Apple: escaneo BLE iniciado");
