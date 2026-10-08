@@ -17,14 +17,14 @@ public class KeychronBatteryProtocolTests
         var req = KeychronBatteryProtocol.Request(KeychronBatteryProtocol.CmdBattery);
         Assert.Equal(33, req.Length);
         Assert.Equal(0x00, req[0]);
-        Assert.Equal(0xBA, req[1]);
+        Assert.Equal(0xCA, req[1]);
     }
 
     [Fact]
     public void Parsea_bateria_inalambrica_medida()
     {
         // 76 %, flags = medición vigente, 3920 mV (0x0F50), transporte 2.4 GHz
-        var s = KeychronBatteryProtocol.ParseBattery(Report(0xBA, 1, 76, 0x08, 0x50, 0x0F, 0x04));
+        var s = KeychronBatteryProtocol.ParseBattery(Report(0xCA, 1, 76, 0x08, 0x50, 0x0F, 0x04));
 
         Assert.NotNull(s);
         Assert.Equal(76, s.Percent);
@@ -39,7 +39,7 @@ public class KeychronBatteryProtocolTests
     public void Parsea_carga_por_cable()
     {
         // flags = cargando + USB con energía, sin medición vigente
-        var s = KeychronBatteryProtocol.ParseBattery(Report(0xBA, 1, 100, 0x05, 0x68, 0x10, 0x01))!;
+        var s = KeychronBatteryProtocol.ParseBattery(Report(0xCA, 1, 100, 0x05, 0x68, 0x10, 0x01))!;
 
         Assert.True(s.Charging);
         Assert.True(s.UsbPower);
@@ -58,7 +58,7 @@ public class KeychronBatteryProtocolTests
     [Fact]
     public void Ignora_version_de_formato_desconocida()
     {
-        Assert.Null(KeychronBatteryProtocol.ParseBattery(Report(0xBA, 2, 50, 0x08)));
+        Assert.Null(KeychronBatteryProtocol.ParseBattery(Report(0xCA, 2, 50, 0x08)));
     }
 
     [Fact]

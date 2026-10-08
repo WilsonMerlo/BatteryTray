@@ -1,8 +1,8 @@
 From f24078b8f21d81d483e6b85001076fe4cac24b2e Mon Sep 17 00:00:00 2001
 From: Wilson Julian Merlo <julimerlo8@gmail.com>
 Date: Thu, 8 Oct 2026 16:59:41 -0300
-Subject: [PATCH] =?UTF-8?q?K8=20HE=20ANSI:=20keymap=20sunset=20con=20Signa?=
- =?UTF-8?q?lRGB=20y=20bater=C3=ADa=20por=20raw=20HID?=
+Subject: [PATCH 1/2] =?UTF-8?q?K8=20HE=20ANSI:=20keymap=20sunset=20con=20S?=
+ =?UTF-8?q?ignalRGB=20y=20bater=C3=ADa=20por=20raw=20HID?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -629,6 +629,58 @@ index 0000000..b236fa7
 +#define SRGB_DEVICE_ERROR_LED_COUNT 254
 +
 +bool signalrgb_rx(uint8_t src, uint8_t *data, uint8_t length);
+-- 
+2.55.0.windows.1
+
+
+From 81468531893220aaa1be9483a866224d001e2eb2 Mon Sep 17 00:00:00 2001
+From: Wilson Julian Merlo <julimerlo8@gmail.com>
+Date: Thu, 8 Oct 2026 17:22:36 -0300
+Subject: [PATCH 2/2] =?UTF-8?q?K8=20HE=20sunset:=20comando=20de=20bater?=
+ =?UTF-8?q?=C3=ADa=200xBA=20->=200xCA?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+El Keychron Link (firmware 0.3.1) no reenvía al teclado los IDs
+0xB0-0xBF ni 0xF0-0xFF: los contesta él mismo con 0xFF. Medido por
+latencia (~7 ms el Link, ~11 ms ida y vuelta al teclado).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../keychron/k8_he/ansi/keymaps/sunset/battery_hid.h | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.h b/keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.h
+index d08aa11..ac4f640 100644
+--- a/keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.h
++++ b/keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.h
+@@ -5,8 +5,8 @@
+ 
+ /* Comando raw HID de batería (solo lectura), para BatteryTray.
+  *
+- * Pedido (32 bytes):  [0] = 0xBA
+- * Respuesta:          [0] = 0xBA
++ * Pedido (32 bytes):  [0] = 0xCA
++ * Respuesta:          [0] = 0xCA
+  *                     [1] = versión del formato (1)
+  *                     [2] = porcentaje 0-100
+  *                     [3] = flags: bit0 cargando, bit1 carga completa, bit2 USB con energía,
+@@ -14,8 +14,12 @@
+  *                     [4..5] = voltaje de la batería en mV (little endian)
+  *                     [6] = transporte actual (1 = USB, 2 = Bluetooth, 4 = 2.4 GHz)
+  *
+- * Funciona por cable y, con WILRESS_RAW_ENABLE, a través del receptor Keychron Link. */
+-#define BATTERY_HID_CMD 0xBA
++ * Funciona por cable y, con WILRESS_RAW_ENABLE, a través del receptor Keychron Link.
++ *
++ * Ojo al elegir el ID: el Keychron Link (firmware 0.3.1) NO reenvía al teclado los IDs
++ * 0xB0-0xBF ni 0xF0-0xFF: los contesta él mismo (0xB1 es un comando propio del Link).
++ * Medido por latencia: ~7 ms contesta el Link, ~11 ms va y vuelve al teclado. */
++#define BATTERY_HID_CMD 0xCA
+ #define BATTERY_HID_VERSION 1
+ 
+ #define BATTERY_HID_FLAG_CHARGING 0x01
 -- 
 2.55.0.windows.1
 

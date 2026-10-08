@@ -3,13 +3,13 @@ using HidSharp;
 namespace BatteryTray.Core.Providers.Keychron;
 
 /// <summary>
-/// Teclados Keychron con el firmware propio que agrega el comando de batería 0xBA
+/// Teclados Keychron con el firmware propio que agrega el comando de batería 0xCA
 /// (por ahora el K8 HE "sunset"). Con el firmware de fábrica no responden y no aparecen.
 ///
 /// Se habla con la interfaz raw HID de VIA (uso 0xFF60:0x61):
 ///  - del teclado, cuando está por cable;
 ///  - del receptor Keychron Link, que reenvía el pedido al teclado por 2.4 GHz.
-/// Solo se envían comandos de lectura (0xBA y el 0x01 de VIA).
+/// Solo se envían comandos de lectura (0xCA y el 0x01 de VIA).
 /// </summary>
 public sealed class KeychronHidProvider : IBatteryProvider
 {

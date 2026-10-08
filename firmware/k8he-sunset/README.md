@@ -8,7 +8,7 @@ Keychron 1.1.1 (`Keychron/qmk_firmware`, rama `2025q3`, ver `BASE.txt`).
 | Keymap | El configurado en Keychron Launcher (export del 2026-10-08): el de Keychron, con F20/F21/F22 arriba a la derecha en la capa Windows. Verificado tecla por tecla contra el `.bin` compilado. |
 | Sunset Wave | Efecto RGB propio; `Fn + Backspace` lo activa. |
 | SignalRGB | Protocolo 1.0.6 (plugin "Keychron K8 HE QMK Keyboard"), solo por cable. |
-| Batería | Comando raw HID `0xBA` (ver `battery_hid.h` en el parche). Lo usa BatteryTray. |
+| Batería | Comando raw HID `0xCA` (ver `battery_hid.h` en el parche). Lo usa BatteryTray. |
 | 2.4 GHz | `WILRESS_RAW_ENABLE`: el teclado atiende comandos raw HID que llegan por el Keychron Link. |
 | Perfil HE | Valores de fábrica = perfil "Default" exportado del Launcher (solo se usan si el perfil se resetea). |
 

@@ -1,6 +1,6 @@
 namespace BatteryTray.Core.Providers.Keychron;
 
-/// <summary>Respuesta al comando de batería 0xBA del firmware "sunset" del K8 HE.</summary>
+/// <summary>Respuesta al comando de batería 0xCA del firmware "sunset" del K8 HE.</summary>
 internal sealed record KeychronBatteryStatus(
     int Percent,
     bool Charging,
@@ -17,13 +17,13 @@ internal sealed record KeychronIdentity(int Vid, int Pid);
 /// Protocolo raw HID (interfaz de uso 0xFF60:0x61, reports de 32 bytes) del firmware propio del
 /// K8 HE. Ver keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.h en la rama sunset-battery.
 ///
-///   pedido:    [0xBA]
-///   respuesta: [0xBA, versión, %, flags, mV lo, mV hi, transporte]
+///   pedido:    [0xCA]
+///   respuesta: [0xCA, versión, %, flags, mV lo, mV hi, transporte]
 ///   flags: bit0 cargando, bit1 carga completa, bit2 USB con energía, bit3 medición vigente
 /// </summary>
 internal static class KeychronBatteryProtocol
 {
-    public const byte CmdBattery = 0xBA;
+    public const byte CmdBattery = 0xCA;   // 0xB0-0xBF los intercepta el Keychron Link
     public const byte CmdViaProtocolVersion = 0x01;
     public const int ReportLength = 32;
 

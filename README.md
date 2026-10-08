@@ -78,7 +78,7 @@ así la app detecta periféricos nuevos sin tocar código:
 | Razer (HID) | Cualquier periférico Razer con batería | Feature reports de 90 bytes (protocolo de OpenRazer). Tabla con ~80 PIDs de OpenRazer; los modelos desconocidos se prueban con los transaction IDs conocidos. |
 | Apple (BLE) | AirPods y Beats | Escucha los advertisements "proximity pairing" (company ID `0x004C`, tipo `0x07`). Resolución de 10 %. Solo muestra los modelos emparejados con la PC. |
 | Mandos | Cualquier mando reconocido por Windows | `Windows.Gaming.Input` → `TryGetBatteryReport()`. Los de Xbox informan en pasos gruesos. |
-| Keychron (HID) | Teclados Keychron con el firmware propio (K8 HE "sunset") | Comando raw HID `0xBA` al teclado (cable) o a través del Keychron Link (2.4 GHz). Ver `firmware/k8he-sunset`. |
+| Keychron (HID) | Teclados Keychron con el firmware propio (K8 HE "sunset") | Comando raw HID `0xCA` al teclado (cable) o a través del Keychron Link (2.4 GHz). Ver `firmware/k8he-sunset`. |
 | Bluetooth (Windows) | Teclados, mouse, auriculares Bluetooth | Propiedad de batería de la pila BT de Windows + servicio GATT Battery (`0x180F`). |
 
 Si un proveedor falla, los demás siguen y sus dispositivos conservan la última lectura.
