@@ -13,7 +13,7 @@ internal sealed class DevicePopup : Form
     // Medidas en píxeles a 96 DPI; se escalan con Px().
     const int PopupWidth = 360;
     const int Pad = 16;
-    const int HeaderHeight = 52;
+    const int TopPadding = 8;
     const int RowHeight = 64;
     const int ExtraLineHeight = 18;
     const int EmptyHeight = 64;
@@ -236,7 +236,7 @@ internal sealed class DevicePopup : Form
     int ContentHeight()
     {
         var rows = _devices.Count == 0 ? EmptyHeight : _devices.Sum(d => RowHeight + (HasExtraLine(d) ? ExtraLineHeight : 0));
-        return HeaderHeight + rows + FooterHeight;
+        return TopPadding + rows + FooterHeight;
     }
 
     void PaintContent(Graphics g, Theme t)
@@ -248,20 +248,13 @@ internal sealed class DevicePopup : Form
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
         g.Clear(t.Background);
 
-        using var titleFont = new Font("Segoe UI Semibold", 16 * s, GraphicsUnit.Pixel);
         using var nameFont = new Font("Segoe UI Semibold", 14 * s, GraphicsUnit.Pixel);
         using var smallFont = new Font("Segoe UI", 12 * s, GraphicsUnit.Pixel);
         using var glyphFont = new Font(Glyphs.FontName, 16 * s, GraphicsUnit.Pixel);
         using var smallGlyphFont = new Font(Glyphs.FontName, 12 * s, GraphicsUnit.Pixel);
 
-        // --- encabezado
-        DrawText(g, "Baterías", titleFont, t.Text, new RectangleF(Px(Pad), Px(14), width, Px(24)));
-        _refreshHit = new Rectangle(width - Px(Pad) - Px(32), Px(10), Px(32), Px(32));
-        if (_refreshHover) FillRounded(g, t.Surface, _refreshHit, 4 * s);
-        DrawText(g, Glyphs.Refresh, glyphFont, _refreshing ? t.Accent : t.SecondaryText, _refreshHit, StringAlignment.Center, StringAlignment.Center);
-
         // --- filas
-        var y = Px(HeaderHeight);
+        var y = Px(TopPadding);
         _rowHits.Clear();
         if (_devices.Count == 0)
         {
@@ -286,9 +279,12 @@ internal sealed class DevicePopup : Form
         using (var pen = new Pen(t.Border))
             g.DrawLine(pen, Px(Pad), y, width - Px(Pad), y);
         var footerRect = new RectangleF(Px(Pad), y, width - 2 * Px(Pad), Px(FooterHeight));
-        var footer = _updated is DateTimeOffset u ? $"Actualizado {u.ToLocalTime():HH:mm:ss}" : "Consultando…";
-        DrawText(g, footer, smallFont, t.SecondaryText, footerRect, StringAlignment.Near, StringAlignment.Center);
-        DrawText(g, "Clic en un dispositivo: opciones", smallFont, t.SecondaryText, footerRect, StringAlignment.Far, StringAlignment.Center);
+        DrawText(g, "Clic en un dispositivo: opciones", smallFont, t.SecondaryText, footerRect, StringAlignment.Near, StringAlignment.Center);
+
+        // Botón de actualizar, a la derecha del pie (azul mientras consulta).
+        _refreshHit = new Rectangle(width - Px(Pad) - Px(28), y + (Px(FooterHeight) - Px(28)) / 2, Px(28), Px(28));
+        if (_refreshHover) FillRounded(g, t.Surface, _refreshHit, 4 * s);
+        DrawText(g, Glyphs.Refresh, smallGlyphFont, _refreshing ? t.Accent : t.SecondaryText, _refreshHit, StringAlignment.Center, StringAlignment.Center);
 
         using (var border = new Pen(t.Border))
             g.DrawRectangle(border, 0, 0, width - 1, height - 1);
