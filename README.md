@@ -11,7 +11,7 @@ periféricos inalámbricos: mouse, teclado, auriculares, AirPods y mandos.
 | Fase | Contenido | Estado |
 |------|-----------|--------|
 | 0 | Herramienta de diagnóstico (consola) | ✅ |
-| 1 | Proveedores: Razer, Apple (AirPods/Beats), mandos, Bluetooth genérico | ✅ (falta probar AirPods con el estuche abierto) |
+| 1 | Proveedores: Razer, Apple (AirPods/Beats), mandos, Bluetooth genérico | ✅ |
 | 2 | Interfaz de bandeja, autoarranque, notificaciones | pendiente |
 | 3 | Investigación: Flydigi, BlackShark V2 Pro Xbox, Keychron 2.4 GHz | pendiente |
 

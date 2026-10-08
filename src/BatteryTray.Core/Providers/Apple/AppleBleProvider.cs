@@ -140,6 +140,11 @@ public sealed partial class AppleBleProvider : IBatteryProvider
             var status = ProximityPairing.TryDecode(data);
             if (status is null) continue;
 
+            // Con los auriculares fuera del estuche, el mensaje trae el estuche como desconocido:
+            // conservamos el último valor conocido (el estuche no se descarga solo en minutos).
+            if (status.Case is null && _seen.TryGetValue(status.ModelPid, out var previous) && previous.Status.Case is not null)
+                status = status with { Case = previous.Status.Case, CaseCharging = previous.Status.CaseCharging };
+
             _seen[status.ModelPid] = new Observation(status, e.RawSignalStrengthInDBm, DateTimeOffset.Now);
             Log.Debug($"Apple: 0x{status.ModelPid:X4} RSSI {e.RawSignalStrengthInDBm} L={status.Left} R={status.Right} " +
                       $"estuche={status.Case} [{Convert.ToHexString(data)}]");

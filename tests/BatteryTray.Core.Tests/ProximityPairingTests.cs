@@ -28,6 +28,22 @@ public class ProximityPairingTests
         Assert.Equal("AirPods 4 (ANC)", AppleModels.Find(s.ModelPid).Name);
     }
 
+    // Capturados en la fase 1 con los AirPods afuera del estuche: cada auricular anuncia con el
+    // bit de "primario" opuesto (0x21 vs 0x01) y los nibbles invertidos (A9 vs 9A).
+    [Theory]
+    [InlineData("0719011B2021A98F110004358EAE1BF61ABD79EFC7866ECDAE5E41")]
+    [InlineData("0719011B20019A8F1100049C5CA850DC80DBB0927700AFA3AE8A37")]
+    public void Ambos_auriculares_reales_coinciden_fuera_del_estuche(string hex)
+    {
+        var s = ProximityPairing.TryDecode(Hex(hex))!;
+
+        Assert.Equal(90, s.Left);
+        Assert.Equal(100, s.Right);
+        Assert.Null(s.Case);                    // nibble F: el estuche no informa con los auriculares afuera
+        Assert.False(s.LeftCharging);
+        Assert.False(s.RightCharging);
+    }
+
     [Fact]
     public void Invierte_izquierda_y_derecha_si_el_primario_es_el_derecho()
     {
