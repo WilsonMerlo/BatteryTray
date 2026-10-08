@@ -6,6 +6,16 @@ periféricos inalámbricos: mouse, teclado, auriculares, AirPods y mandos.
 - C# / .NET 8 (`net8.0-windows10.0.19041.0`, para usar las APIs WinRT de Bluetooth y Gaming.Input)
 - Sin drivers, sin permisos de administrador y sin interferir con Razer Synapse.
 
+![Ventana de BatteryTray en tema oscuro y claro](docs/preview.png)
+
+## Descargar
+
+En [Releases](../../releases) está `BatteryTray.exe`: un solo archivo, no hace falta instalar .NET.
+Copialo a una carpeta fija (por ejemplo `%LocalAppData%\Programs\BatteryTray`), ejecutalo y aparece
+el ícono en la bandeja. "Iniciar con Windows" se activa desde el menú del ícono.
+
+Windows SmartScreen puede avisar que la app no está firmada: "Más información" → "Ejecutar de todas formas".
+
 ## Estado
 
 | Fase | Contenido | Estado |
@@ -119,8 +129,6 @@ Los datos de protocolo (bytes, offsets y tablas de modelos) se tomaron de
 [OpenRazer](https://github.com/openrazer/openrazer) y [CAPod](https://github.com/d4rken-org/capod).
 No se copió código.
 ## Fase 2 — App de bandeja
-
-![Ventana en tema oscuro y claro, e íconos de ejemplo](docs/preview.png)
 
 ```
 dotnet build -c Release

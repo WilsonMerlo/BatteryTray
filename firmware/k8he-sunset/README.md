@@ -20,7 +20,7 @@ Requiere [QMK MSYS](https://msys.qmk.fm/). En la consola de QMK MSYS:
 git clone --depth 1 --branch 2025q3 https://github.com/Keychron/qmk_firmware.git
 cd qmk_firmware
 git submodule update --init --depth 1 lib/chibios lib/chibios-contrib lib/printf
-git am /c/Users/Wilson/Downloads/SonarChatMix/BatteryTray/firmware/k8he-sunset/0001-k8he-sunset-signalrgb-bateria.patch
+git am <ruta-a-BatteryTray>/firmware/k8he-sunset/0001-k8he-sunset-signalrgb-bateria.patch
 make keychron/k8_he/ansi:sunset
 ```
 
