@@ -31,6 +31,9 @@ public sealed class ProvidersConfig
 {
     public RazerConfig Razer { get; set; } = new();
     public AppleConfig Apple { get; set; } = new();
+
+    /// <summary>Teclados Keychron con el firmware propio que informa la batería (K8 HE "sunset").</summary>
+    public ToggleConfig Keychron { get; set; } = new();
     public ToggleConfig GameControllers { get; set; } = new();
     public ToggleConfig WindowsBluetooth { get; set; } = new();
 }

@@ -27,6 +27,7 @@ src/BatteryTray.Core/          modelo, proveedores, monitor, configuración y lo
   Providers/                   mandos (Windows.Gaming.Input) y Bluetooth genérico
 tools/BatteryTray.Diag/        fase 0: diagnóstico por consola
 tools/BatteryTray.Cli/         fase 1: consola para probar los proveedores
+firmware/k8he-sunset/          fase 3c: firmware propio del K8 HE (parche, binario y cómo flashearlo)
 tests/BatteryTray.Core.Tests/  tests de los decodificadores (xUnit)
 ```
 
@@ -77,6 +78,7 @@ así la app detecta periféricos nuevos sin tocar código:
 | Razer (HID) | Cualquier periférico Razer con batería | Feature reports de 90 bytes (protocolo de OpenRazer). Tabla con ~80 PIDs de OpenRazer; los modelos desconocidos se prueban con los transaction IDs conocidos. |
 | Apple (BLE) | AirPods y Beats | Escucha los advertisements "proximity pairing" (company ID `0x004C`, tipo `0x07`). Resolución de 10 %. Solo muestra los modelos emparejados con la PC. |
 | Mandos | Cualquier mando reconocido por Windows | `Windows.Gaming.Input` → `TryGetBatteryReport()`. Los de Xbox informan en pasos gruesos. |
+| Keychron (HID) | Teclados Keychron con el firmware propio (K8 HE "sunset") | Comando raw HID `0xBA` al teclado (cable) o a través del Keychron Link (2.4 GHz). Ver `firmware/k8he-sunset`. |
 | Bluetooth (Windows) | Teclados, mouse, auriculares Bluetooth | Propiedad de batería de la pila BT de Windows + servicio GATT Battery (`0x180F`). |
 
 Si un proveedor falla, los demás siguen y sus dispositivos conservan la última lectura.
@@ -107,6 +109,7 @@ dotnet test
 | `providers.razer.extraDevices` | `[]` | `{ "pid": "0x00XX", "transactionId": "0x1F", "hasCharging": true, "waitMs": 60 }` |
 | `providers.apple.onlyPairedModels` | true | Solo modelos emparejados (evita mostrar los AirPods de otros) |
 | `providers.apple.minRssi` | -90 | Ignorar señales más débiles (dBm) |
+| `providers.keychron.enabled` | true | Teclados Keychron con firmware propio |
 
 Los ids de cada dispositivo se ven en la salida de `BatteryTray.Cli`.
 

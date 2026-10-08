@@ -1,0 +1,634 @@
+From f24078b8f21d81d483e6b85001076fe4cac24b2e Mon Sep 17 00:00:00 2001
+From: Wilson Julian Merlo <julimerlo8@gmail.com>
+Date: Thu, 8 Oct 2026 16:59:41 -0300
+Subject: [PATCH] =?UTF-8?q?K8=20HE=20ANSI:=20keymap=20sunset=20con=20Signa?=
+ =?UTF-8?q?lRGB=20y=20bater=C3=ADa=20por=20raw=20HID?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Keymap igual al configurado en Keychron Launcher (F20-F22 arriba a la
+  derecha en la capa Windows) y efecto Sunset Wave (Fn + Backspace).
+- Protocolo SignalRGB 1.0.6 adaptado del módulo de SRGBmods.
+- Comando raw HID 0xBA: nivel, carga y voltaje de la batería.
+- WILRESS_RAW_ENABLE para atender raw HID por 2.4 GHz / Bluetooth, y
+  corrección de la llamada a raw_hid_receive() en wireless.c.
+- Ganchos kc_raw_hid_rx_user() y profile_reset_user(); perfil HE por
+  defecto = perfil exportado del Launcher.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../keychron/common/analog_matrix/profile.c   |   6 +
+ .../keychron/common/analog_matrix/profile.h   |   1 +
+ keyboards/keychron/common/keychron_raw_hid.c  |   8 ++
+ keyboards/keychron/common/keychron_raw_hid.h  |   1 +
+ keyboards/keychron/common/wireless/wireless.c |   2 +-
+ .../k8_he/ansi/keymaps/sunset/battery_hid.c   |  40 ++++++
+ .../k8_he/ansi/keymaps/sunset/battery_hid.h   |  26 ++++
+ .../k8_he/ansi/keymaps/sunset/config.h        |   6 +
+ .../k8_he/ansi/keymaps/sunset/he_defaults.c   |  47 +++++++
+ .../k8_he/ansi/keymaps/sunset/keymap.c        |  95 ++++++++++++++
+ .../ansi/keymaps/sunset/rgb_matrix_user.inc   | 117 ++++++++++++++++++
+ .../k8_he/ansi/keymaps/sunset/rules.mk        |   4 +
+ .../k8_he/ansi/keymaps/sunset/signalrgb.c     |  84 +++++++++++++
+ .../k8_he/ansi/keymaps/sunset/signalrgb.h     |  35 ++++++
+ 14 files changed, 471 insertions(+), 1 deletion(-)
+ create mode 100644 keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.c
+ create mode 100644 keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.h
+ create mode 100644 keyboards/keychron/k8_he/ansi/keymaps/sunset/config.h
+ create mode 100644 keyboards/keychron/k8_he/ansi/keymaps/sunset/he_defaults.c
+ create mode 100644 keyboards/keychron/k8_he/ansi/keymaps/sunset/keymap.c
+ create mode 100644 keyboards/keychron/k8_he/ansi/keymaps/sunset/rgb_matrix_user.inc
+ create mode 100644 keyboards/keychron/k8_he/ansi/keymaps/sunset/rules.mk
+ create mode 100644 keyboards/keychron/k8_he/ansi/keymaps/sunset/signalrgb.c
+ create mode 100644 keyboards/keychron/k8_he/ansi/keymaps/sunset/signalrgb.h
+
+diff --git a/keyboards/keychron/common/analog_matrix/profile.c b/keyboards/keychron/common/analog_matrix/profile.c
+index 1feff29..280e15e 100644
+--- a/keyboards/keychron/common/analog_matrix/profile.c
++++ b/keyboards/keychron/common/analog_matrix/profile.c
+@@ -315,6 +315,9 @@ bool profile_save(uint8_t prof_index) {
+     return true;
+ }
+ 
++/* Gancho para el keymap: ajustar un perfil recién reseteado antes de guardarlo. */
++__attribute__((weak)) void profile_reset_user(uint8_t prof_index, analog_matrix_profile_t *prof) {}
++
+ bool profile_reset(uint8_t prof_index) {
+     if (prof_index >= PROFILE_COUNT) return false;
+ 
+@@ -335,6 +338,9 @@ bool profile_reset(uint8_t prof_index) {
+             }
+         }
+ 
++    // Valores de fábrica propios del keymap (si los define).
++    profile_reset_user(prof_index, prof);
++
+     profile_save(prof_index);
+ 
+     return true;
+diff --git a/keyboards/keychron/common/analog_matrix/profile.h b/keyboards/keychron/common/analog_matrix/profile.h
+index 1735df4..5629eaf 100644
+--- a/keyboards/keychron/common/analog_matrix/profile.h
++++ b/keyboards/keychron/common/analog_matrix/profile.h
+@@ -30,6 +30,7 @@ bool profile_set_traval(uint8_t prof_idx, uint8_t mode, uint8_t act_pt, uint8_t
+ bool profile_set_name(uint8_t prof_idx, uint8_t len, uint8_t *name);
+ bool profile_set_socd(uint8_t *data);
+ bool profile_reset(uint8_t prof_index);
++void profile_reset_user(uint8_t prof_index, analog_matrix_profile_t *prof);
+ bool profile_save(uint8_t prof_index);
+ bool profile_set_adv_mode(uint8_t *data);
+ void process_profile_select_combo(void);
+diff --git a/keyboards/keychron/common/keychron_raw_hid.c b/keyboards/keychron/common/keychron_raw_hid.c
+index b3657af..8ad0709 100644
+--- a/keyboards/keychron/common/keychron_raw_hid.c
++++ b/keyboards/keychron/common/keychron_raw_hid.c
+@@ -128,7 +128,15 @@ void kc_raw_hid_send(uint8_t src, uint8_t *data, uint8_t len) {
+ #    endif
+ }
+ 
++/* Gancho para el keymap: permite atender comandos raw HID propios (SignalRGB, batería)
++ * antes que Keychron y VIA. Devolver true si el comando fue atendido. */
++__attribute__((weak)) bool kc_raw_hid_rx_user(uint8_t src, uint8_t *data, uint8_t length) {
++    return false;
++}
++
+ bool kc_raw_hid_rx(uint8_t src, uint8_t *data, uint8_t length) {
++    if (kc_raw_hid_rx_user(src, data, length)) return true;
++
+ #    if defined(ANANLOG_MATRIX) && defined(VIA_ENABLE)
+     if (src == RAW_HID_SRC_USB && data[0] == id_get_keyboard_value && data[1] == id_switch_matrix_state) {
+         send_analog_matrix(data, length);
+diff --git a/keyboards/keychron/common/keychron_raw_hid.h b/keyboards/keychron/common/keychron_raw_hid.h
+index e10f659..865ff0c 100644
+--- a/keyboards/keychron/common/keychron_raw_hid.h
++++ b/keyboards/keychron/common/keychron_raw_hid.h
+@@ -86,3 +86,4 @@ enum {
+ };
+ 
+ void kc_raw_hid_send(uint8_t src, uint8_t *data, uint8_t len);
++bool kc_raw_hid_rx_user(uint8_t src, uint8_t *data, uint8_t length);
+diff --git a/keyboards/keychron/common/wireless/wireless.c b/keyboards/keychron/common/wireless/wireless.c
+index f5483be..5414935 100644
+--- a/keyboards/keychron/common/wireless/wireless.c
++++ b/keyboards/keychron/common/wireless/wireless.c
+@@ -610,7 +610,7 @@ void wireless_event_task(void) {
+ #if defined(RAW_ENABLE) && defined(WILRESS_RAW_ENABLE)
+             case EVT_RAW_HID:
+ #    ifdef VIA_ENABLE
+-                via_raw_hid_receive(RAW_HID_SRC_WIRELESS, event.params.raw_hid_data, 32);
++                raw_hid_receive(RAW_HID_SRC_WIRELESS, event.params.raw_hid_data, 32);   // antes via_raw_hid_receive (ya no existe)
+ #    else
+                 kc_raw_hid_rx(RAW_HID_SRC_WIRELESS, event.params.raw_hid_data, 32);
+ #    endif
+diff --git a/keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.c b/keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.c
+new file mode 100644
+index 0000000..e7b80be
+--- /dev/null
++++ b/keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.c
+@@ -0,0 +1,40 @@
++#include "quantum.h"
++#include "battery_hid.h"
++#include "keychron_raw_hid.h"
++#include "battery.h"
++#include "transport.h"
++#include "lpm.h"
++
++bool battery_hid_rx(uint8_t src, uint8_t *data, uint8_t length) {
++    if (data[0] != BATTERY_HID_CMD) return false;
++
++    memset(&data[1], 0, length - 1);
++
++    uint8_t flags = 0;
++    if (usb_power_connected()) {
++        flags |= BATTERY_HID_FLAG_USB_POWER;
++#if defined(BAT_CHARGING_PIN)
++        // Misma lógica que battery_task(): con USB, pin activo = cargando; si no, carga completa.
++        if (gpio_read_pin(BAT_CHARGING_PIN) == BAT_CHARGING_LEVEL)
++            flags |= BATTERY_HID_FLAG_CHARGING;
++        else
++            flags |= BATTERY_HID_FLAG_FULL;
++#endif
++    }
++
++    // El chip inalámbrico mide el voltaje periódicamente solo en modo inalámbrico. Por cable
++    // queda el último valor (o el de arranque), así que se marca como no vigente.
++    transport_t transport = get_transport();
++    if ((transport & TRANSPORT_WIRELESS) && !battery_power_on_sample()) flags |= BATTERY_HID_FLAG_MEASURED;
++
++    uint16_t mv = battery_get_voltage();
++    data[1]     = BATTERY_HID_VERSION;
++    data[2]     = battery_get_percentage();
++    data[3]     = flags;
++    data[4]     = mv & 0xFF;
++    data[5]     = mv >> 8;
++    data[6]     = (uint8_t)transport;
++
++    kc_raw_hid_send(src, data, length);
++    return true;
++}
+diff --git a/keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.h b/keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.h
+new file mode 100644
+index 0000000..d08aa11
+--- /dev/null
++++ b/keyboards/keychron/k8_he/ansi/keymaps/sunset/battery_hid.h
+@@ -0,0 +1,26 @@
++#pragma once
++
++#include <stdbool.h>
++#include <stdint.h>
++
++/* Comando raw HID de batería (solo lectura), para BatteryTray.
++ *
++ * Pedido (32 bytes):  [0] = 0xBA
++ * Respuesta:          [0] = 0xBA
++ *                     [1] = versión del formato (1)
++ *                     [2] = porcentaje 0-100
++ *                     [3] = flags: bit0 cargando, bit1 carga completa, bit2 USB con energía,
++ *                                  bit3 medición vigente (el voltaje solo se mide en modo inalámbrico)
++ *                     [4..5] = voltaje de la batería en mV (little endian)
++ *                     [6] = transporte actual (1 = USB, 2 = Bluetooth, 4 = 2.4 GHz)
++ *
++ * Funciona por cable y, con WILRESS_RAW_ENABLE, a través del receptor Keychron Link. */
++#define BATTERY_HID_CMD 0xBA
++#define BATTERY_HID_VERSION 1
++
++#define BATTERY_HID_FLAG_CHARGING 0x01
++#define BATTERY_HID_FLAG_FULL 0x02
++#define BATTERY_HID_FLAG_USB_POWER 0x04
++#define BATTERY_HID_FLAG_MEASURED 0x08
++
++bool battery_hid_rx(uint8_t src, uint8_t *data, uint8_t length);
+diff --git a/keyboards/keychron/k8_he/ansi/keymaps/sunset/config.h b/keyboards/keychron/k8_he/ansi/keymaps/sunset/config.h
+new file mode 100644
+index 0000000..af6e179
+--- /dev/null
++++ b/keyboards/keychron/k8_he/ansi/keymaps/sunset/config.h
+@@ -0,0 +1,6 @@
++#pragma once
++
++/* Atender comandos raw HID que llegan por la conexión inalámbrica (Keychron Link / Bluetooth).
++ * El firmware de Keychron trae el código pero ningún teclado lo activa. Hace falta para
++ * leer la batería por 2.4 GHz. (Sí, el nombre tiene un error de tipeo en el original.) */
++#define WILRESS_RAW_ENABLE
+diff --git a/keyboards/keychron/k8_he/ansi/keymaps/sunset/he_defaults.c b/keyboards/keychron/k8_he/ansi/keymaps/sunset/he_defaults.c
+new file mode 100644
+index 0000000..7fcc5e3
+--- /dev/null
++++ b/keyboards/keychron/k8_he/ansi/keymaps/sunset/he_defaults.c
+@@ -0,0 +1,47 @@
++/* Perfil HE por defecto = perfil "Default" exportado de Keychron Launcher el 2026-10-08
++ * (HEProfile-Default-2026-10-08.json).
++ *
++ * Solo se aplica cuando el firmware resetea un perfil: EEPROM borrada o "Reset" del perfil
++ * desde el Launcher. Al flashear este firmware los perfiles guardados se conservan; esto es
++ * el respaldo para no tener que configurarlo de nuevo si alguna vez se pierden. */
++#include QMK_KEYBOARD_H
++#include "profile.h"
++
++/* Global del perfil 0: actuación a 2,0 mm, sensibilidad Rapid Trigger 0,4 mm. */
++#define HE_P0_GLOBAL_MODE AKM_REGULAR
++#define HE_P0_GLOBAL_ACT_PT 20
++#define HE_P0_GLOBAL_SENS 4
++#define HE_P0_GLOBAL_SENS_RLS 4
++
++/* Por tecla [fila][columna]: {modo, actuación, sensibilidad RT, sensibilidad RT al soltar}.
++ * Modo: 0 = usa el global, 1 = actuación fija, 2 = Rapid Trigger. Distancias en 0,1 mm. */
++// clang-format off
++static const uint8_t he_profile0[MATRIX_ROWS][MATRIX_COLS][4] = {
++    {{1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {2,38,1,1}, {2,38,1,1}, {2,38,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}},
++    {{1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {2,38,1,1}},
++    {{1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1,38,1,1}},
++    {{1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {0, 0,0,0}, {1, 8,1,1}, {2,38,1,1}, {2,38,1,1}},
++    {{1, 8,1,1}, {0, 0,0,0}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {0, 0,0,0}, {1, 8,1,1}, {0, 0,0,0}, {1, 8,1,1}},
++    {{1, 8,1,1}, {2,38,1,1}, {1, 8,1,1}, {0, 0,0,0}, {0, 0,0,0}, {0, 0,0,0}, {1, 8,1,1}, {0, 0,0,0}, {0, 0,0,0}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}, {1, 8,1,1}},
++};
++// clang-format on
++
++void profile_reset_user(uint8_t prof_index, analog_matrix_profile_t *prof) {
++    if (prof_index != 0) return;   // los perfiles 2 y 3 quedan con los valores de Keychron
++
++    prof->global.mode               = HE_P0_GLOBAL_MODE;
++    prof->global.act_pt             = HE_P0_GLOBAL_ACT_PT;
++    prof->global.rpd_trig_sen       = HE_P0_GLOBAL_SENS;
++    prof->global.rpd_trig_sen_deact = HE_P0_GLOBAL_SENS_RLS;
++
++    for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
++        for (uint8_t c = 0; c < MATRIX_COLS; c++) {
++            analog_key_config_t *k = &prof->key_config[r][c];
++            k->mode               = he_profile0[r][c][0];
++            k->act_pt             = he_profile0[r][c][1];
++            k->rpd_trig_sen       = he_profile0[r][c][2];
++            k->rpd_trig_sen_deact = he_profile0[r][c][3];
++            k->adv_mode           = 0;
++        }
++    }
++}
+diff --git a/keyboards/keychron/k8_he/ansi/keymaps/sunset/keymap.c b/keyboards/keychron/k8_he/ansi/keymaps/sunset/keymap.c
+new file mode 100644
+index 0000000..9e3c417
+--- /dev/null
++++ b/keyboards/keychron/k8_he/ansi/keymaps/sunset/keymap.c
+@@ -0,0 +1,95 @@
++/* Copyright 2025 @ Keychron (https://www.keychron.com)
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/* Keymap "sunset" para el Keychron K8 HE ANSI:
++ *  - Keymap igual al configurado en Keychron Launcher (exportado el 2026-10-08):
++ *    el de Keychron, salvo que en la capa Windows las tres teclas de arriba a la
++ *    derecha son F20, F21 y F22.
++ *  - Efecto RGB "Sunset Wave" (Fn + Backspace lo activa).
++ *  - Protocolo SignalRGB 1.0.6 (por cable).
++ *  - Comando raw HID de batería para BatteryTray (por cable y por 2.4 GHz).
++ *  - Perfil HE por defecto = el perfil exportado del Launcher.
++ */
++
++#include QMK_KEYBOARD_H
++#include "keychron_common.h"
++#include "signalrgb.h"
++#include "battery_hid.h"
++
++enum layers {
++    MAC_BASE,
++    MAC_FN,
++    WIN_BASE,
++    WIN_FN,
++};
++
++#define FN_MAC MO(MAC_FN)
++#define FN_WIN MO(WIN_FN)
++
++// clang-format off
++const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
++    [MAC_BASE] = LAYOUT_ansi_87(
++        KC_ESC,             KC_BRID,  KC_BRIU,  KC_MCTRL, KC_LNPAD, UG_VALD,  UG_VALU,  KC_MPRV,  KC_MPLY,  KC_MNXT,  KC_MUTE,  KC_VOLD,  KC_VOLU,   KC_SNAP,  KC_SIRI,  UG_NEXT,
++        KC_GRV,   KC_1,     KC_2,     KC_3,     KC_4,     KC_5,     KC_6,     KC_7,     KC_8,     KC_9,     KC_0,     KC_MINS,  KC_EQL,   KC_BSPC,   KC_INS,   KC_HOME,  KC_PGUP,
++        KC_TAB,   KC_Q,     KC_W,     KC_E,     KC_R,     KC_T,     KC_Y,     KC_U,     KC_I,     KC_O,     KC_P,     KC_LBRC,  KC_RBRC,  KC_BSLS,   KC_DEL,   KC_END,   KC_PGDN,
++        KC_CAPS,  KC_A,     KC_S,     KC_D,     KC_F,     KC_G,     KC_H,     KC_J,     KC_K,     KC_L,     KC_SCLN,  KC_QUOT,            KC_ENT,
++        KC_LSFT,            KC_Z,     KC_X,     KC_C,     KC_V,     KC_B,     KC_N,     KC_M,     KC_COMM,  KC_DOT,   KC_SLSH,            KC_RSFT,             KC_UP,
++        KC_LCTL,  KC_LOPTN, KC_LCMMD,                               KC_SPC,                                 KC_RCMMD, KC_ROPTN, FN_MAC,   KC_RCTL,   KC_LEFT,  KC_DOWN,  KC_RGHT),
++
++    [MAC_FN] = LAYOUT_ansi_87(
++        _______,            KC_F1,    KC_F2,    KC_F3,    KC_F4,    KC_F5,    KC_F6,    KC_F7,    KC_F8,    KC_F9,    KC_F10,   KC_F11,   KC_F12,    _______,  _______,  UG_TOGG,
++        _______,  BT_HST1,  BT_HST2,  BT_HST3,  P2P4G,    _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,   _______,  _______,  _______,
++        UG_TOGG,  UG_NEXT,  UG_VALU,  UG_HUEU,  UG_SATU,  UG_SPDU,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,   _______,  _______,  _______,
++        _______,  UG_PREV,  UG_VALD,  UG_HUED,  UG_SATD,  UG_SPDD,  _______,  _______,  _______,  _______,  _______,  _______,            _______,
++        _______,            _______,  _______,  _______,  _______,  BAT_LVL,  _______,  _______,  _______,  _______,  _______,            _______,             _______,
++        _______,  _______,  _______,                                _______,                                _______,  _______,  _______,  _______,   _______,  _______,  _______),
++
++    [WIN_BASE] = LAYOUT_ansi_87(
++        KC_ESC,             KC_F1,    KC_F2,    KC_F3,    KC_F4,    KC_F5,    KC_F6,    KC_F7,    KC_F8,    KC_F9,    KC_F10,   KC_F11,   KC_F12,    KC_F20,   KC_F21,   KC_F22,
++        KC_GRV,   KC_1,     KC_2,     KC_3,     KC_4,     KC_5,     KC_6,     KC_7,     KC_8,     KC_9,     KC_0,     KC_MINS,  KC_EQL,   KC_BSPC,   KC_INS,   KC_HOME,  KC_PGUP,
++        KC_TAB,   KC_Q,     KC_W,     KC_E,     KC_R,     KC_T,     KC_Y,     KC_U,     KC_I,     KC_O,     KC_P,     KC_LBRC,  KC_RBRC,  KC_BSLS,   KC_DEL,   KC_END,   KC_PGDN,
++        KC_CAPS,  KC_A,     KC_S,     KC_D,     KC_F,     KC_G,     KC_H,     KC_J,     KC_K,     KC_L,     KC_SCLN,  KC_QUOT,            KC_ENT,
++        KC_LSFT,            KC_Z,     KC_X,     KC_C,     KC_V,     KC_B,     KC_N,     KC_M,     KC_COMM,  KC_DOT,   KC_SLSH,            KC_RSFT,             KC_UP,
++        KC_LCTL,  KC_LGUI,  KC_LALT,                                KC_SPC,                                 KC_RALT,  KC_RGUI,  FN_WIN,   KC_RCTL,   KC_LEFT,  KC_DOWN,  KC_RGHT),
++
++    [WIN_FN] = LAYOUT_ansi_87(
++        _______,            KC_BRID,  KC_BRIU,  KC_TASK,  KC_FILE,  UG_VALD,  UG_VALU,  KC_MPRV,  KC_MPLY,  KC_MNXT,  KC_MUTE,  KC_VOLD,  KC_VOLU,   _______,  _______,  UG_TOGG,
++        _______,  BT_HST1,  BT_HST2,  BT_HST3,  P2P4G,    _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,   _______,  _______,  _______,
++        UG_TOGG,  UG_NEXT,  UG_VALU,  UG_HUEU,  UG_SATU,  UG_SPDU,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,   _______,  _______,  _______,
++        _______,  UG_PREV,  UG_VALD,  UG_HUED,  UG_SATD,  UG_SPDD,  _______,  _______,  _______,  _______,  _______,  _______,            _______,
++        _______,            _______,  _______,  _______,  _______,  BAT_LVL,  _______,  _______,  _______,  _______,  _______,            _______,             _______,
++        _______,  _______,  _______,                                _______,                                _______,  _______,  _______,  _______,   _______,  _______,  _______)
++};
++// clang-format on
++
++// Fn + Backspace -> salta directo al efecto Sunset Wave
++bool process_record_user(uint16_t keycode, keyrecord_t *record) {
++    if (keycode == KC_BSPC && (IS_LAYER_ON(MAC_FN) || IS_LAYER_ON(WIN_FN))) {
++        if (record->event.pressed) {
++            rgb_matrix_enable();
++            rgb_matrix_mode(RGB_MATRIX_CUSTOM_SUNSET_WAVE);
++        }
++        return false;
++    }
++    return true;
++}
++
++// Comandos raw HID propios: se atienden antes que los de Keychron y VIA.
++bool kc_raw_hid_rx_user(uint8_t src, uint8_t *data, uint8_t length) {
++    if (battery_hid_rx(src, data, length)) return true;
++    if (signalrgb_rx(src, data, length)) return true;
++    return false;
++}
+diff --git a/keyboards/keychron/k8_he/ansi/keymaps/sunset/rgb_matrix_user.inc b/keyboards/keychron/k8_he/ansi/keymaps/sunset/rgb_matrix_user.inc
+new file mode 100644
+index 0000000..720f17d
+--- /dev/null
++++ b/keyboards/keychron/k8_he/ansi/keymaps/sunset/rgb_matrix_user.inc
+@@ -0,0 +1,117 @@
++/* Sunset Wave — efecto custom para Keychron K8 HE
++ *
++ * Una ola de degradé estilo "Arco iris" de Aura Sync, pero con una paleta de
++ * atardecer: amarillo -> naranja -> rosa -> magenta -> violeta (y vuelta),
++ * con un tramo violeta más largo y un toque pastel para que no sature.
++ *
++ * Controles (los mismos de siempre, en la capa Fn):
++ *   Fn + W / Fn + S  -> brillo
++ *   Fn + T / Fn + G  -> velocidad de la ola
++ *   Fn + R / Fn + F  -> saturación: bajarla (Fn + F) lo hace MÁS pastel
++ *   Fn + E / Fn + D  -> (sin uso en este efecto)
++ *
++ * Todo lo que se puede tunear está en la sección "AJUSTES".
++ */
++
++RGB_MATRIX_EFFECT(SUNSET_WAVE)
++
++/* Modo SignalRGB: no dibuja nada, los colores los manda SignalRGB por raw HID. */
++RGB_MATRIX_EFFECT(SIGNALRGB)
++
++#ifdef RGB_MATRIX_CUSTOM_EFFECT_IMPLS
++
++/* ========================= AJUSTES ========================= */
++
++/* Paleta. Va de izquierda a derecha y después vuelve (ida y vuelta), así la
++ * ola no tiene un "corte" brusco entre violeta y amarillo.
++ * Los valores están corregidos para LEDs: en un LED el verde pesa mucho, por
++ * eso el amarillo tiene menos verde que en pantalla (si no se ve lima). */
++static const uint8_t SW_PALETTE[][3] = {
++    {255, 175,  25}, // amarillo
++    {255, 105,  15}, // naranja
++    {255,  35,  95}, // rosa
++    {215,  15, 185}, // magenta
++    {150,  25, 255}, // violeta
++    {125,  35, 255}, // violeta profundo  (repetido = más violeta en la ola)
++    {215,  15, 185}, // magenta
++    {255,  35,  95}, // rosa
++    {255, 105,  15}, // naranja
++};
++
++/* Blanco cálido hacia el que se "lava" el color para hacerlo pastel.
++ * El blanco puro (255,255,255) en LEDs suele verse azulado. */
++#define SW_WHITE_R 255
++#define SW_WHITE_G 215
++#define SW_WHITE_B 200
++
++/* Cuánto pastel (0 = color puro, 255 = blanco).
++ * BASE es lo que tenés con la saturación al máximo; bajando la saturación
++ * con Fn + F se va acercando a MAX. */
++#define SW_PASTEL_BASE 55
++#define SW_PASTEL_MAX 190
++
++/* Qué parte del ciclo de colores entra a lo ancho del teclado.
++ * Más alto = franjas más angostas (se ven más colores a la vez). */
++#define SW_SPREAD 175
++
++/* Leve inclinación diagonal de la ola (0 = franjas verticales). */
++#define SW_TILT 40
++
++/* 1 = la ola viaja hacia la derecha, 0 = hacia la izquierda. */
++#define SW_LEFT_TO_RIGHT 1
++
++/* =========================================================== */
++
++#define SW_STOPS (sizeof(SW_PALETTE) / sizeof(SW_PALETTE[0]))
++
++static inline uint8_t sw_lerp8(uint8_t a, uint8_t b, uint8_t frac) {
++    return (uint8_t)(a + (((int16_t)b - (int16_t)a) * (int16_t)frac) / 255);
++}
++
++static bool SUNSET_WAVE(effect_params_t *params) {
++    RGB_MATRIX_USE_LIMITS(led_min, led_max);
++
++    /* Tiempo -> fase de la ola. A velocidad media (127) un ciclo completo
++     * tarda ~8 s; a velocidad máxima ~4 s; a mínima ~65 s. */
++    uint16_t t = (uint16_t)(g_rgb_timer * (uint32_t)((rgb_matrix_config.speed >> 4) + 1));
++
++    /* Pastel: mezcla con blanco cálido, controlado por la saturación. */
++    uint8_t pastel = SW_PASTEL_BASE + (uint8_t)(((uint16_t)(255 - rgb_matrix_config.hsv.s) * (SW_PASTEL_MAX - SW_PASTEL_BASE)) / 255);
++    uint8_t val    = rgb_matrix_config.hsv.v;
++
++    for (uint8_t i = led_min; i < led_max; i++) {
++        RGB_MATRIX_TEST_LED_FLAGS();
++
++        uint16_t pos = (uint16_t)(g_led_config.point[i].x * SW_SPREAD + g_led_config.point[i].y * SW_TILT);
++#if SW_LEFT_TO_RIGHT
++        pos -= t;
++#else
++        pos += t;
++#endif
++
++        /* Ubicar el tramo de la paleta y cuánto avanzamos dentro de él. */
++        uint32_t scaled = (uint32_t)pos * SW_STOPS;
++        uint8_t  seg    = (uint8_t)(scaled >> 16);
++        uint8_t  frac   = (uint8_t)((scaled >> 8) & 0xFF);
++        const uint8_t *a = SW_PALETTE[seg];
++        const uint8_t *b = SW_PALETTE[(seg + 1) % SW_STOPS];
++
++        uint8_t r = sw_lerp8(a[0], b[0], frac);
++        uint8_t g = sw_lerp8(a[1], b[1], frac);
++        uint8_t bl = sw_lerp8(a[2], b[2], frac);
++
++        r  = sw_lerp8(r, SW_WHITE_R, pastel);
++        g  = sw_lerp8(g, SW_WHITE_G, pastel);
++        bl = sw_lerp8(bl, SW_WHITE_B, pastel);
++
++        rgb_matrix_set_color(i, scale8(r, val), scale8(g, val), scale8(bl, val));
++    }
++    return rgb_matrix_check_finished_leds(led_max);
++}
++
++static bool SIGNALRGB(effect_params_t *params) {
++    RGB_MATRIX_USE_LIMITS(led_min, led_max);
++    return rgb_matrix_check_finished_leds(led_max);
++}
++
++#endif // RGB_MATRIX_CUSTOM_EFFECT_IMPLS
+diff --git a/keyboards/keychron/k8_he/ansi/keymaps/sunset/rules.mk b/keyboards/keychron/k8_he/ansi/keymaps/sunset/rules.mk
+new file mode 100644
+index 0000000..d3ce4ca
+--- /dev/null
++++ b/keyboards/keychron/k8_he/ansi/keymaps/sunset/rules.mk
+@@ -0,0 +1,4 @@
++VIA_ENABLE = yes
++RGB_MATRIX_CUSTOM_USER = yes
++
++SRC += signalrgb.c battery_hid.c he_defaults.c
+diff --git a/keyboards/keychron/k8_he/ansi/keymaps/sunset/signalrgb.c b/keyboards/keychron/k8_he/ansi/keymaps/sunset/signalrgb.c
+new file mode 100644
+index 0000000..8d1d682
+--- /dev/null
++++ b/keyboards/keychron/k8_he/ansi/keymaps/sunset/signalrgb.c
+@@ -0,0 +1,84 @@
++/* Protocolo SignalRGB 1.0.6, adaptado del módulo comunitario de SRGBmods
++ * (https://github.com/SRGBmods/QMK_Community_Module, GPL-2.0-or-later).
++ *
++ * Diferencias con el original:
++ *  - Se engancha en kc_raw_hid_rx_user() (firmware de Keychron) en vez de via_command_kb().
++ *  - Responde con kc_raw_hid_send() para respetar el origen del pedido.
++ *  - El modo "SignalRGB" es un efecto de rgb_matrix_user.inc (RGB_MATRIX_CUSTOM_SIGNALRGB).
++ *  - Solo atiende pedidos por cable, como el plugin. */
++#include QMK_KEYBOARD_H
++#include "signalrgb.h"
++#include "raw_hid.h"
++#include "keychron_raw_hid.h"
++
++static uint8_t packet[32];
++
++static void srgb_reply(uint8_t src, uint8_t command, uint8_t b1, uint8_t b2, uint8_t b3) {
++    memset(packet, 0, sizeof(packet));
++    packet[0] = command;
++    packet[1] = b1;
++    packet[2] = b2;
++    packet[3] = b3;
++    kc_raw_hid_send(src, packet, sizeof(packet));
++}
++
++static void srgb_stream(uint8_t src, uint8_t *data) {
++    uint8_t index = data[1];
++    uint8_t count = data[2];
++
++    if (index + count > RGB_MATRIX_LED_COUNT) {
++        srgb_reply(src, SRGB_STREAM_RGB_DATA, SRGB_DEVICE_ERROR_LED_BOUNDS, 0, 0);
++        return;
++    }
++    if (count >= 10) {
++        srgb_reply(src, SRGB_STREAM_RGB_DATA, SRGB_DEVICE_ERROR_LED_COUNT, 0, 0);
++        return;
++    }
++
++    for (uint8_t i = 0; i < count; i++) {
++        uint8_t offset = (i * 3) + 3;
++        uint8_t led    = index + i;
++
++#if defined(CAPS_LOCK_INDEX)
++        // Bloq Mayús encendido: la tecla queda blanca para no perder el indicador.
++        if (led == CAPS_LOCK_INDEX && host_keyboard_led_state().caps_lock) {
++            rgb_matrix_set_color(led, 255, 255, 255);
++            continue;
++        }
++#endif
++        rgb_matrix_set_color(led, data[offset], data[offset + 1], data[offset + 2]);
++    }
++}
++
++bool signalrgb_rx(uint8_t src, uint8_t *data, uint8_t length) {
++    if (data[0] < SRGB_GET_QMK_VERSION || data[0] > SRGB_GET_FIRMWARE_TYPE) return false;
++    if (src != RAW_HID_SRC_USB) return true;   // SignalRGB solo funciona por cable
++
++    switch (data[0]) {
++        case SRGB_GET_QMK_VERSION:
++            srgb_reply(src, data[0], SRGB_QMK_VERSION_BYTE_1, SRGB_QMK_VERSION_BYTE_2, SRGB_QMK_VERSION_BYTE_3);
++            break;
++        case SRGB_GET_PROTOCOL_VERSION:
++            srgb_reply(src, data[0], SRGB_PROTOCOL_VERSION_BYTE_1, SRGB_PROTOCOL_VERSION_BYTE_2, SRGB_PROTOCOL_VERSION_BYTE_3);
++            break;
++        case SRGB_GET_UNIQUE_IDENTIFIER:
++            srgb_reply(src, data[0], 0, 0, 0);
++            break;
++        case SRGB_STREAM_RGB_DATA:
++            srgb_stream(src, data);
++            break;
++        case SRGB_SET_MODE_ENABLE:
++            rgb_matrix_mode_noeeprom(RGB_MATRIX_CUSTOM_SIGNALRGB);
++            break;
++        case SRGB_SET_MODE_DISABLE:
++            rgb_matrix_reload_from_eeprom();   // vuelve al último efecto guardado
++            break;
++        case SRGB_GET_TOTAL_LEDS:
++            srgb_reply(src, data[0], RGB_MATRIX_LED_COUNT, 0, 0);
++            break;
++        case SRGB_GET_FIRMWARE_TYPE:
++            srgb_reply(src, data[0], SRGB_FIRMWARE_TYPE_BYTE, 0, 0);
++            break;
++    }
++    return true;
++}
+diff --git a/keyboards/keychron/k8_he/ansi/keymaps/sunset/signalrgb.h b/keyboards/keychron/k8_he/ansi/keymaps/sunset/signalrgb.h
+new file mode 100644
+index 0000000..b236fa7
+--- /dev/null
++++ b/keyboards/keychron/k8_he/ansi/keymaps/sunset/signalrgb.h
+@@ -0,0 +1,35 @@
++/* Protocolo SignalRGB 1.0.6, adaptado del módulo comunitario de SRGBmods
++ * (https://github.com/SRGBmods/QMK_Community_Module, GPL-2.0-or-later)
++ * a la forma de despachar comandos raw HID del firmware de Keychron. */
++#pragma once
++
++#include <stdbool.h>
++#include <stdint.h>
++
++enum signalrgb_commands {
++    SRGB_GET_QMK_VERSION        = 0x21,
++    SRGB_GET_PROTOCOL_VERSION   = 0x22,
++    SRGB_GET_UNIQUE_IDENTIFIER  = 0x23,
++    SRGB_STREAM_RGB_DATA        = 0x24,
++    SRGB_SET_MODE_ENABLE        = 0x25,
++    SRGB_SET_MODE_DISABLE       = 0x26,
++    SRGB_GET_TOTAL_LEDS         = 0x27,
++    SRGB_GET_FIRMWARE_TYPE      = 0x28,
++};
++
++#define SRGB_PROTOCOL_VERSION_BYTE_1 1
++#define SRGB_PROTOCOL_VERSION_BYTE_2 0
++#define SRGB_PROTOCOL_VERSION_BYTE_3 6
++
++/* Versión de QMK informada (el plugin solo la muestra en su log). */
++#define SRGB_QMK_VERSION_BYTE_1 0
++#define SRGB_QMK_VERSION_BYTE_2 28
++#define SRGB_QMK_VERSION_BYTE_3 0
++
++/* 2 = firmware con VIA (el plugin hace una lectura extra por paquete). */
++#define SRGB_FIRMWARE_TYPE_BYTE 2
++
++#define SRGB_DEVICE_ERROR_LED_BOUNDS 253
++#define SRGB_DEVICE_ERROR_LED_COUNT 254
++
++bool signalrgb_rx(uint8_t src, uint8_t *data, uint8_t length);
+-- 
+2.55.0.windows.1
+
