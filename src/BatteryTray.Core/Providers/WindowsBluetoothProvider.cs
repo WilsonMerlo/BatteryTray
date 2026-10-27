@@ -32,15 +32,34 @@ public sealed class WindowsBluetoothProvider : IBatteryProvider
         return byContainer.Values.ToList();
     }
 
+    /// <summary>
+    /// La propiedad vive en los devnodes Bluetooth del dispositivo, que comparten el ContainerId
+    /// del emparejamiento. Se buscan solo esos: recorrer todos los devnodes del sistema (cientos)
+    /// en cada consulta es caro.
+    /// </summary>
     async Task AddPropertyBatteriesAsync(Dictionary<Guid, BatteryReading> into)
     {
-        var nodes = await DeviceInformation.FindAllAsync("", [BatteryKey, DevContainerKey], DeviceInformationKind.Device);
-        foreach (var n in nodes)
+        var containers = new HashSet<Guid>();
+        foreach (var selector in new[]
+                 {
+                     BluetoothDevice.GetDeviceSelectorFromPairingState(true),
+                     BluetoothLEDevice.GetDeviceSelectorFromPairingState(true),
+                 })
         {
-            if (Get(n, BatteryKey) is not byte level) continue;
-            if (Get(n, DevContainerKey) is not Guid container || into.ContainsKey(container)) continue;
+            var endpoints = await DeviceInformation.FindAllAsync(selector, [AepContainerKey], DeviceInformationKind.AssociationEndpoint);
+            foreach (var ep in endpoints)
+                if (Get(ep, AepContainerKey) is Guid c)
+                    containers.Add(c);
+        }
 
-            var (name, connected) = await ContainerInfoAsync(container, n.Name);
+        foreach (var container in containers)
+        {
+            var nodes = await DeviceInformation.FindAllAsync(
+                $"{DevContainerKey}:=\"{{{container}}}\"", [BatteryKey], DeviceInformationKind.Device);
+            var node = nodes.FirstOrDefault(n => Get(n, BatteryKey) is byte);
+            if (node is null || Get(node, BatteryKey) is not byte level) continue;
+
+            var (name, connected) = await ContainerInfoAsync(container, node.Name);
             into[container] = new BatteryReading
             {
                 Id = $"bt:{container}",
@@ -98,16 +117,20 @@ public sealed class WindowsBluetoothProvider : IBatteryProvider
         }
     }
 
+    /// <summary>
+    /// Servicios y características salen de la caché de Windows: descubrirlos de nuevo por aire en
+    /// cada consulta le mete tráfico al enlace de un mouse o teclado BLE. Solo el valor se lee fresco.
+    /// </summary>
     static async Task<int?> ReadBatteryAsync(BluetoothLEDevice dev)
     {
-        var services = await dev.GetGattServicesForUuidAsync(GattServiceUuids.Battery, BluetoothCacheMode.Uncached);
+        var services = await dev.GetGattServicesForUuidAsync(GattServiceUuids.Battery, BluetoothCacheMode.Cached);
         if (services.Status != GattCommunicationStatus.Success) return null;
 
         foreach (var svc in services.Services)
         {
             using (svc)
             {
-                var chars = await svc.GetCharacteristicsForUuidAsync(GattCharacteristicUuids.BatteryLevel, BluetoothCacheMode.Uncached);
+                var chars = await svc.GetCharacteristicsForUuidAsync(GattCharacteristicUuids.BatteryLevel, BluetoothCacheMode.Cached);
                 if (chars.Status != GattCommunicationStatus.Success) continue;
                 foreach (var ch in chars.Characteristics)
                 {

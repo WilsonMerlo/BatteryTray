@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using BatteryTray.Core.Config;
 
 namespace BatteryTray.Core;
@@ -10,6 +11,8 @@ namespace BatteryTray.Core;
 ///  - Si un proveedor responde pero un dispositivo ya no aparece, queda como desconectado
 ///    con su último nivel conocido.
 ///  - Si una lectura llega sin nivel (dispositivo dormido, etc.), se conserva el nivel anterior.
+///  - Si la consulta anterior de un proveedor sigue colgada (p. ej. una llamada HID que no vuelve),
+///    no se lanza otra encima: dos consultas a la vez al mismo receptor se pisan los comandos.
 /// </summary>
 public sealed class BatteryMonitor : IDisposable
 {
@@ -23,6 +26,7 @@ public sealed class BatteryMonitor : IDisposable
     readonly Dictionary<string, BatteryReading> _devices = [];
     readonly HashSet<string> _lowNotified = [];
     readonly SemaphoreSlim _pollLock = new(1, 1);
+    readonly ConcurrentDictionary<IBatteryProvider, Task> _running = new();
     CancellationTokenSource? _loopCts;
 
     public BatteryMonitor(IReadOnlyList<IBatteryProvider> providers, AppConfig config)
@@ -121,15 +125,23 @@ public sealed class BatteryMonitor : IDisposable
         }
     }
 
-    static async Task<(IBatteryProvider Provider, IReadOnlyList<BatteryReading>? Readings)> RunProviderAsync(
+    async Task<(IBatteryProvider Provider, IReadOnlyList<BatteryReading>? Readings)> RunProviderAsync(
         IBatteryProvider provider, CancellationToken ct)
     {
+        if (_running.TryGetValue(provider, out var previous) && !previous.IsCompleted)
+        {
+            Log.Warn($"{provider.Name}: la consulta anterior todavía no terminó, se saltea esta vuelta");
+            return (provider, null);
+        }
+
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(ProviderTimeout);
         var started = DateTime.UtcNow;
         try
         {
-            var readings = await provider.QueryAsync(timeout.Token).WaitAsync(timeout.Token);
+            var query = provider.QueryAsync(timeout.Token);
+            _running[provider] = query;
+            var readings = await query.WaitAsync(timeout.Token);
             Log.Debug($"{provider.Name}: {readings.Count} dispositivo(s) en {(DateTime.UtcNow - started).TotalMilliseconds:0} ms");
             return (provider, readings);
         }
@@ -191,6 +203,14 @@ public sealed class BatteryMonitor : IDisposable
             }
         }
         return low;
+    }
+
+    /// <summary>Corta el ciclo y espera a que termine la consulta en curso (para no pisarse con otro monitor).</summary>
+    public async Task StopAsync()
+    {
+        _loopCts?.Cancel();
+        if (await _pollLock.WaitAsync(ProviderTimeout + TimeSpan.FromSeconds(5)))
+            _pollLock.Release();
     }
 
     public void Dispose()

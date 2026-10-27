@@ -10,8 +10,13 @@ namespace BatteryTray.Core.Providers.Apple;
 
 /// <summary>
 /// AirPods y Beats: Windows no expone su batería, pero ellos la anuncian por BLE en el mensaje
-/// "proximity pairing". Un watcher escucha todo el tiempo y guarda el último mensaje de cada modelo;
-/// la consulta periódica solo lee ese estado.
+/// "proximity pairing". En cada consulta se escucha unos segundos en modo pasivo y se guarda el
+/// último mensaje de cada modelo.
+///
+/// El escaneo no queda prendido todo el tiempo: un escaneo BLE continuo ocupa la radio Bluetooth
+/// y la banda de 2.4 GHz que comparten los receptores inalámbricos (mouse, teclado, auriculares).
+/// En modo pasivo no se transmite nada: el mensaje de Apple viene en el advertising mismo, así
+/// que no hace falta pedir el scan response. Si no hay ningún modelo de Apple emparejado, no se escanea.
 ///
 /// Como cada auricular anuncia con una dirección aleatoria que rota, no se puede asociar el
 /// mensaje a "tus" AirPods por dirección. Se asocia por modelo: por defecto solo se muestran
@@ -23,22 +28,25 @@ public sealed partial class AppleBleProvider : IBatteryProvider
 
     sealed record PairedApple(string Name, ushort Pid, bool Connected);
 
+    /// <summary>Cuánto se escucha en cada consulta.</summary>
+    static readonly TimeSpan ScanWindow = TimeSpan.FromSeconds(8);
+
     readonly AppleConfig _config;
     readonly ConcurrentDictionary<ushort, Observation> _seen = new();
     readonly Dictionary<Guid, ushort?> _pidByContainer = [];
     BluetoothLEAdvertisementWatcher? _watcher;
+    bool _scanFailing;
 
     public AppleBleProvider(AppleConfig config) => _config = config;
 
     public string Name => "Apple (BLE)";
 
-    public void Start() => EnsureWatcher();
-
     public async Task<IReadOnlyList<BatteryReading>> QueryAsync(CancellationToken ct)
     {
-        EnsureWatcher();
-
         var paired = await GetPairedAppleDevicesAsync();
+        if (paired.Count > 0 || !_config.OnlyPairedModels)
+            await ScanAsync(ct);
+
         var readings = new List<BatteryReading>();
 
         foreach (var p in paired)
@@ -102,32 +110,31 @@ public sealed partial class AppleBleProvider : IBatteryProvider
         };
     }
 
-    void EnsureWatcher()
+    /// <summary>Escucha <see cref="ScanWindow"/> en modo pasivo y apaga el escaneo.</summary>
+    async Task ScanAsync(CancellationToken ct)
     {
-        if (_watcher is { Status: BluetoothLEAdvertisementWatcherStatus.Started or BluetoothLEAdvertisementWatcherStatus.Stopping })
-            return;
-
+        var watcher = new BluetoothLEAdvertisementWatcher { ScanningMode = BluetoothLEScanningMode.Passive };
+        watcher.Received += OnReceived;
         try
         {
-            if (_watcher is null)
-            {
-                // Misma configuración que el diagnóstico de la fase 0, que ya probó recibir los AirPods 4.
-                // El filtrado (Apple + tipo 0x07) se hace en OnReceived.
-                _watcher = new BluetoothLEAdvertisementWatcher { ScanningMode = BluetoothLEScanningMode.Active };
-                _watcher.Received += OnReceived;
-                _watcher.Stopped += (_, e) =>
-                {
-                    if (e.Error == BluetoothError.Success) Log.Debug("Apple: escaneo BLE detenido");
-                    else Log.Warn($"Apple: el escaneo BLE se detuvo ({e.Error})");
-                };
-            }
-            _watcher.Start();
-            Log.Info("Apple: escaneo BLE iniciado");
+            watcher.Start();
+            if (_scanFailing) Log.Info("Apple: el escaneo BLE volvió a funcionar");
+            _scanFailing = false;
+            _watcher = watcher;
+            await Task.Delay(ScanWindow, ct);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Típicamente: Bluetooth apagado. Se reintenta en la próxima consulta.
-            Log.Warn($"Apple: no se pudo iniciar el escaneo BLE ({ex.GetType().Name} 0x{ex.HResult:X8})");
+            // Típicamente Bluetooth apagado o adaptador desconectado (0x800710DF). Se avisa una vez.
+            if (!_scanFailing)
+                Log.Warn($"Apple: no se pudo iniciar el escaneo BLE ({ex.GetType().Name} 0x{ex.HResult:X8}); se reintenta en cada consulta");
+            _scanFailing = true;
+        }
+        finally
+        {
+            _watcher = null;
+            watcher.Received -= OnReceived;
+            try { watcher.Stop(); } catch { /* no había arrancado */ }
         }
     }
 
@@ -150,8 +157,9 @@ public sealed partial class AppleBleProvider : IBatteryProvider
                 status = status with { Case = previous.Status.Case, CaseCharging = previous.Status.CaseCharging };
 
             _seen[status.ModelPid] = new Observation(status, e.RawSignalStrengthInDBm, DateTimeOffset.Now);
-            Log.Debug($"Apple: 0x{status.ModelPid:X4} RSSI {e.RawSignalStrengthInDBm} L={status.Left} R={status.Right} " +
-                      $"estuche={status.Case} [{Convert.ToHexString(data)}]");
+            if (Log.Verbose)
+                Log.Debug($"Apple: 0x{status.ModelPid:X4} RSSI {e.RawSignalStrengthInDBm} L={status.Left} R={status.Right} " +
+                          $"estuche={status.Case} [{Convert.ToHexString(data)}]");
         }
     }
 
@@ -202,8 +210,9 @@ public sealed partial class AppleBleProvider : IBatteryProvider
 
     public void Dispose()
     {
-        if (_watcher is null) return;
-        _watcher.Received -= OnReceived;
-        try { _watcher.Stop(); } catch { /* ya detenido */ }
+        var watcher = _watcher;
+        if (watcher is null) return;
+        watcher.Received -= OnReceived;
+        try { watcher.Stop(); } catch { /* ya detenido */ }
     }
 }

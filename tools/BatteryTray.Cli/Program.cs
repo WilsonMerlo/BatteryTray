@@ -3,16 +3,16 @@ using BatteryTray.Core;
 using BatteryTray.Core.Config;
 
 // Consola de prueba de la fase 1: consulta todos los proveedores y muestra una tabla.
-//   BatteryTray.Cli                 una consulta (espera unos segundos a que lleguen los advertisements BLE)
+//   BatteryTray.Cli                 una consulta (espera unos segundos a que Windows enumere los mandos)
 //   BatteryTray.Cli --watch         consulta cada PollIntervalSeconds hasta Ctrl+C
-//   BatteryTray.Cli --wait 15       segundos de escucha BLE antes de la primera consulta (default 10)
+//   BatteryTray.Cli --wait 15       segundos de espera antes de la primera consulta (default 3)
 //   BatteryTray.Cli -v              log detallado también en consola
 
 Console.OutputEncoding = Encoding.UTF8;
 
 var watch = args.Contains("--watch");
 var verbose = args.Contains("-v") || args.Contains("--verbose");
-var waitSeconds = 10;
+var waitSeconds = 3;
 var waitIndex = Array.IndexOf(args, "--wait");
 if (waitIndex >= 0 && waitIndex + 1 < args.Length && int.TryParse(args[waitIndex + 1], out var w))
     waitSeconds = Math.Max(0, w);
@@ -31,7 +31,7 @@ monitor.LowBattery += (_, d) => Console.WriteLine($"\n⚠  Batería baja: {d.Nam
 monitor.StartProviders();
 if (waitSeconds > 0)
 {
-    Console.WriteLine($"Escuchando {waitSeconds} s para recibir los advertisements BLE...");
+    Console.WriteLine($"Esperando {waitSeconds} s a que Windows enumere los mandos...");
     await Task.Delay(TimeSpan.FromSeconds(waitSeconds));
 }
 

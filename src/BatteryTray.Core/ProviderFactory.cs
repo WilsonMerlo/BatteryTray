@@ -14,6 +14,7 @@ public static class ProviderFactory
         var p = config.Providers;
         var list = new List<IBatteryProvider>();
         if (p.Razer.Enabled) list.Add(new RazerHidProvider(p.Razer));
+        if (p.RazerHeadset.Enabled) list.Add(new RazerHeadsetProvider());
         if (p.Apple.Enabled) list.Add(new AppleBleProvider(p.Apple));
         if (p.Keychron.Enabled) list.Add(new KeychronHidProvider());
         if (p.Flydigi.Enabled) list.Add(new FlydigiHidProvider());

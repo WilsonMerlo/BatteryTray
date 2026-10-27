@@ -11,7 +11,7 @@ namespace BatteryTray.App;
 /// </summary>
 internal sealed class TrayApplicationContext : ApplicationContext
 {
-    /// <summary>Consulta extra al arrancar, para que los AirPods tengan tiempo de anunciarse.</summary>
+    /// <summary>Consulta extra al arrancar: Windows enumera los mandos en segundo plano.</summary>
     static readonly TimeSpan EarlyRefreshDelay = TimeSpan.FromSeconds(15);
 
     readonly NotifyIcon _tray;
@@ -63,7 +63,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     // ---------------------------------------------------------------- monitor
 
-    void StartMonitor()
+    /// <param name="previous">Monitor que se reemplaza: se espera a que termine su consulta antes de arrancar.</param>
+    void StartMonitor(BatteryMonitor? previous = null)
     {
         var monitor = new BatteryMonitor(ProviderFactory.Create(_config), _config);
         monitor.Updated += (_, devices) => _ui.Post(_ => OnUpdated(monitor, devices), null);
@@ -71,8 +72,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _monitor = monitor;
 
         // Fuera del hilo de la UI: las consultas Bluetooth/HID no deben trabar la interfaz.
-        Task.Run(() =>
+        Task.Run(async () =>
         {
+            if (previous is not null)
+            {
+                await previous.StopAsync();
+                previous.Dispose();
+            }
             monitor.StartProviders();
             monitor.StartPolling();
         });
@@ -314,8 +320,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         Log.Info("Configuración modificada, recargando");
         _config = ConfigStore.Load(AppPaths.ConfigFile);
         Log.Verbose = _config.VerboseLog;
-        _monitor?.Dispose();
-        StartMonitor();
+        StartMonitor(_monitor);
         _earlyRefresh.Stop();
         _earlyRefresh.Start();   // los proveedores nuevos necesitan unos segundos (BLE, mandos)
         UpdateTrayIcon();

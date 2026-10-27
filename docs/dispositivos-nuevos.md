@@ -1,6 +1,6 @@
 # Cuando conectes un dispositivo nuevo
 
-Guía para los periféricos que todavía no se probaron (BlackShark V2 Pro Xbox, Flydigi Vader 5 Pro)
+Guía para los periféricos que todavía no se probaron (Flydigi Vader 5 Pro)
 o cualquier otro.
 
 ## 1. ¿Aparece solo?
@@ -10,6 +10,7 @@ pueden agarrar sin hacer nada:
 
 | Si el dispositivo… | Lo toma |
 |---|---|
+| Es un BlackShark V2 Pro (2023 o Xbox) con su receptor | **Razer headset (HID)** |
 | Es Razer y tiene la interfaz de 90 bytes de Razer | **Razer (HID)**: si no está en la tabla, prueba los transaction IDs conocidos solo |
 | Es un mando que Windows reconoce (XInput / Xbox) | **Mandos (Windows.Gaming.Input)** |
 | Está emparejado por Bluetooth y Windows muestra su batería en Configuración | **Bluetooth (Windows)** |
@@ -23,9 +24,8 @@ guardá y mirá el log (menú → "Abrir carpeta de logs").
 
 - **BlackShark V2 Pro (Xbox) por Bluetooth**: debería aparecer por *Bluetooth (Windows)* si Windows
   muestra su batería en Configuración → Bluetooth.
-- **BlackShark V2 Pro (Xbox) por su receptor USB-C**: no hay documentación pública. Si el receptor
-  usa el protocolo de Razer, lo detecta *Razer (HID)*; si declara la batería estándar, *HID genérico*.
-  Si no aparece, ver el paso 2.
+- **BlackShark V2 Pro (Xbox) por su receptor USB-C** (`1532:0A49`): lo toma *Razer headset (HID)*.
+  Con el headset enchufado por cable el receptor deja de responder y aparece como desconectado.
 - **Flydigi Vader 5 Pro**: lo toma *Flydigi (HID)*, en pasos de 20 %. Si el receptor está en modo
   Xbox 360 (XInput) no expone la interfaz de Flydigi: probá cambiar el modo del mando (ver el
   manual) o mirá si aparece en *Mandos*.

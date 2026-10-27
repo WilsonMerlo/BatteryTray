@@ -30,6 +30,9 @@ public sealed class AppConfig
 public sealed class ProvidersConfig
 {
     public RazerConfig Razer { get; set; } = new();
+
+    /// <summary>BlackShark V2 Pro (2023 y Xbox) por su receptor 2.4 GHz.</summary>
+    public ToggleConfig RazerHeadset { get; set; } = new();
     public AppleConfig Apple { get; set; } = new();
 
     /// <summary>Teclados Keychron con el firmware propio que informa la batería (K8 HE "sunset").</summary>

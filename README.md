@@ -25,7 +25,7 @@ Windows SmartScreen puede avisar que la app no está firmada: "Más información
 | 0 | Herramienta de diagnóstico (consola) | ✅ |
 | 1 | Proveedores: Razer, Apple (AirPods/Beats), mandos, Bluetooth genérico | ✅ |
 | 2 | Interfaz de bandeja, autoarranque, notificaciones | ✅ |
-| 3 | Investigación: Keychron K8 HE por 2.4 GHz ✅ (firmware propio); Flydigi y BlackShark pendientes (no llegaron) | en curso |
+| 3 | Investigación: Keychron K8 HE por 2.4 GHz ✅ (firmware propio); BlackShark V2 Pro Xbox ✅; Flydigi pendiente (no llegó) | en curso |
 
 ## Estructura
 
@@ -34,7 +34,7 @@ BatteryTray.sln
 Directory.Build.props          configuración común (TFM, nullable, etc.)
 src/BatteryTray.App/           fase 2: app de bandeja (WinForms)
 src/BatteryTray.Core/          modelo, proveedores, monitor, configuración y log
-  Providers/Razer/             protocolo de feature reports de Razer (OpenRazer)
+  Providers/Razer/             protocolo de feature reports de Razer (OpenRazer) y headsets BlackShark
   Providers/Apple/             AirPods/Beats por BLE "proximity pairing"
   Providers/                   mandos (Windows.Gaming.Input) y Bluetooth genérico
 tools/BatteryTray.Diag/        fase 0: diagnóstico por consola
@@ -88,7 +88,8 @@ así la app detecta periféricos nuevos sin tocar código:
 | Proveedor | Qué detecta | Cómo |
 |-----------|-------------|------|
 | Razer (HID) | Cualquier periférico Razer con batería | Feature reports de 90 bytes (protocolo de OpenRazer). Tabla con ~80 PIDs de OpenRazer; los modelos desconocidos se prueban con los transaction IDs conocidos. |
-| Apple (BLE) | AirPods y Beats | Escucha los advertisements "proximity pairing" (company ID `0x004C`, tipo `0x07`). Resolución de 10 %. Solo muestra los modelos emparejados con la PC. |
+| Razer headset (HID) | BlackShark V2 Pro (2023 y Xbox) por su receptor 2.4 GHz | Reports de 64 B (ID 2) en la interfaz `FF00`: consultas `0x21` (batería) y `0x2A` (carga), protocolo de [blackshark-control](https://github.com/AbdullahSAhmad/blackshark-control) / OpenRazer PR #2862. |
+| Apple (BLE) | AirPods y Beats | Escucha 8 s por consulta, en modo pasivo, los advertisements "proximity pairing" (company ID `0x004C`, tipo `0x07`); no deja el escaneo prendido para no ocupar la banda de 2.4 GHz de los receptores. Resolución de 10 %. Solo muestra los modelos emparejados con la PC. |
 | Mandos | Cualquier mando reconocido por Windows | `Windows.Gaming.Input` → `TryGetBatteryReport()`. Los de Xbox informan en pasos gruesos. |
 | Keychron (HID) | Teclados Keychron con el firmware propio (K8 HE "sunset") | Comando raw HID `0xCA` al teclado (cable) o a través del Keychron Link (2.4 GHz). Ver `firmware/k8he-sunset`. |
 | Flydigi (HID) | Vader 5 Pro, Apex 5/6 (cable o receptor) | Comando `GET_INFO` del protocolo de SDL; pasos de 20 %. Sin probar con el mando real. |
@@ -121,6 +122,7 @@ dotnet test
 | `providers.<x>.enabled` | true | Activa/desactiva cada proveedor |
 | `providers.razer.probeUnknownDevices` | true | Probar modelos Razer que no están en la tabla |
 | `providers.razer.extraDevices` | `[]` | `{ "pid": "0x00XX", "transactionId": "0x1F", "hasCharging": true, "waitMs": 60 }` |
+| `providers.razerHeadset.enabled` | true | Headsets BlackShark V2 Pro por receptor |
 | `providers.apple.onlyPairedModels` | true | Solo modelos emparejados (evita mostrar los AirPods de otros) |
 | `providers.apple.minRssi` | -90 | Ignorar señales más débiles (dBm) |
 | `providers.keychron.enabled` | true | Teclados Keychron con firmware propio |
@@ -163,7 +165,7 @@ src\BatteryTray.App\bin\Release\net8.0-windows10.0.19041.0\BatteryTray.exe
 | Keychron K8 HE por 2.4 GHz → Keychron Link | USB | `3434:D030` | MI_03: raw HID (`FF60:0061`); MI_01: page `0x8C` con feature reports de 1000 B |
 | AirPods 4 ANC | Bluetooth clásico | BT `004C:201B` | Windows no expone batería; BLE proximity pairing con modelo `0x201B` (bytes `1B 20`) |
 | Mando Xbox | Xbox Wireless Adapter `045E:02FE` | `045E:0B12` | `Windows.Gaming.Input` devuelve `BatteryReport` (70 %, descargando) |
-| BlackShark V2 Pro Xbox | — | — | pendiente (todavía no lo tengo) |
+| BlackShark V2 Pro Xbox | receptor 2.4 GHz | `1532:0A49` | MI_03 COL01: `FF00:0001`, in/out report #2 de 64 B (sin feature reports) |
 | Flydigi Vader 5 Pro | — | — | pendiente |
 
 ## Licencia
